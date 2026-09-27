@@ -32,7 +32,7 @@ export default function Sidebar() {
                 ))}
             </div>
 
-            <div className="sidebar-section">
+            {/* <div className="sidebar-section">
                 <div className="section-heading">
                     <span>TOOLS</span>
                 </div>
@@ -43,7 +43,7 @@ export default function Sidebar() {
                         <span className="count">{count}</span>
                     </button>
                 ))}
-            </div>
+            </div> */}
 
             <button className="nav-item settings">Settings</button>
         </aside>

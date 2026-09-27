@@ -5,7 +5,6 @@ use tauri::Manager;
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CreateSnippetInput {
-    snippet_type: String,
     title: String,
     tool: String,
     environment: String,
@@ -20,7 +19,6 @@ struct CreateSnippetInput {
 #[serde(rename_all = "camelCase")]
 struct UpdateSnippetInput {
     id: i64,
-    snippet_type: String,
     title: String,
     tool: String,
     environment: String,
@@ -46,7 +44,6 @@ fn create_snippet(
 
     database::create_snippet(
         &database_path,
-        &input.snippet_type,
         &input.title,
         &input.tool,
         &input.environment,
@@ -90,7 +87,6 @@ fn update_snippet(
     database::update_snippet(
         &database_path,
         input.id,
-        &input.snippet_type,
         &input.title,
         &input.tool,
         &input.environment,
@@ -141,7 +137,8 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir)
                 .expect("failed to create app data directory");
 
-            let database_path = app_data_dir.join("cmdvault.db");
+            let database_path =
+                app_data_dir.join("cmdvault.db");
 
             database::initialize_database(&database_path)
                 .expect("failed to initialize database");

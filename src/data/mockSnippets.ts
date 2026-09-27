@@ -1,6 +1,5 @@
 export type Snippet = {
     id: number;
-    type: "cli" | "sql";
     title: string;
     tool: string;
     environment: string;
@@ -14,7 +13,6 @@ export type Snippet = {
 export const snippets: Snippet[] = [
     {
         id: 1,
-        type: "cli",
         title: "Get pods in namespace",
         tool: "Kubernetes",
         environment: "Bash / Shell",
@@ -26,7 +24,6 @@ export const snippets: Snippet[] = [
     },
     {
         id: 2,
-        type: "cli",
         title: "Check pod logs",
         tool: "Kubernetes",
         environment: "Bash / Shell",
@@ -39,7 +36,6 @@ export const snippets: Snippet[] = [
     },
     {
         id: 3,
-        type: "cli",
         title: "Terraform plan with environment",
         tool: "Terraform",
         environment: "Bash / Shell",
@@ -52,7 +48,6 @@ export const snippets: Snippet[] = [
     },
     {
         id: 4,
-        type: "sql",
         title: "Find duplicate records",
         tool: "SQL",
         environment: "SQL",

@@ -1006,3 +1006,89 @@
 .confirm-delete-button:hover {
   background: #000;
 }
+
+.creatable-select {
+  position: relative;
+  width: 100%;
+}
+
+.creatable-select-control {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+
+.creatable-select-control input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.creatable-select-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+
+  width: 40px;
+  height: 100%;
+
+  border: 0;
+  border-left: 1px solid #e5e5e5;
+  background: transparent;
+
+  cursor: pointer;
+  color: #666;
+  font-size: 14px;
+}
+
+.creatable-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+
+  z-index: 100;
+
+  max-height: 220px;
+  overflow-y: auto;
+
+  padding: 6px;
+
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.creatable-select-option {
+  display: block;
+  width: 100%;
+
+  padding: 9px 10px;
+
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+
+  text-align: left;
+  cursor: pointer;
+  color: #222;
+}
+
+.creatable-select-option:hover {
+  background: #f3f3f3;
+}
+
+.creatable-select-create {
+  border-top: 1px solid #eee;
+  margin-top: 4px;
+  padding-top: 10px;
+
+  font-weight: 500;
+}
+
+.creatable-select-empty {
+  padding: 9px 10px;
+  color: #888;
+  font-size: 13px;
+}

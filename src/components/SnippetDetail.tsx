@@ -92,12 +92,6 @@ export default function SnippetDetail({
                     </div>
 
                     <div className="detail-heading-actions">
-                        <span className="snippet-type-badge">
-                            {snippet.type === "sql"
-                                ? "SQL Query"
-                                : "CLI Command"}
-                        </span>
-
                         <div className="detail-actions">
                             <button
                                 className="detail-action-button"

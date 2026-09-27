@@ -5,7 +5,6 @@ use std::path::Path;
 #[serde(rename_all = "camelCase")]
 pub struct Snippet {
     pub id: i64,
-    pub snippet_type: String,
     pub title: String,
     pub tool: String,
     pub environment: String,
@@ -16,14 +15,15 @@ pub struct Snippet {
     pub created_at: String,
 }
 
-pub fn initialize_database(database_path: &Path) -> Result<()> {
+pub fn initialize_database(
+    database_path: &Path,
+) -> Result<()> {
     let connection = Connection::open(database_path)?;
 
     connection.execute(
         "
         CREATE TABLE IF NOT EXISTS snippets (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            snippet_type TEXT NOT NULL,
             title        TEXT NOT NULL,
             tool         TEXT NOT NULL,
             environment  TEXT NOT NULL,
@@ -42,7 +42,6 @@ pub fn initialize_database(database_path: &Path) -> Result<()> {
 
 pub fn create_snippet(
     database_path: &Path,
-    snippet_type: &str,
     title: &str,
     tool: &str,
     environment: &str,
@@ -57,7 +56,6 @@ pub fn create_snippet(
     connection.execute(
         "
         INSERT INTO snippets (
-            snippet_type,
             title,
             tool,
             environment,
@@ -67,10 +65,9 @@ pub fn create_snippet(
             tags,
             created_at
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
         ",
         (
-            snippet_type,
             title,
             tool,
             environment,
@@ -85,14 +82,15 @@ pub fn create_snippet(
     Ok(connection.last_insert_rowid())
 }
 
-pub fn get_snippets(database_path: &Path) -> Result<Vec<Snippet>> {
+pub fn get_snippets(
+    database_path: &Path,
+) -> Result<Vec<Snippet>> {
     let connection = Connection::open(database_path)?;
 
     let mut statement = connection.prepare(
         "
         SELECT
             id,
-            snippet_type,
             title,
             tool,
             environment,
@@ -107,17 +105,16 @@ pub fn get_snippets(database_path: &Path) -> Result<Vec<Snippet>> {
     )?;
 
     let rows = statement.query_map([], |row| {
-        let tags: String = row.get(8)?;
+        let tags: String = row.get(7)?;
 
         Ok(Snippet {
             id: row.get(0)?,
-            snippet_type: row.get(1)?,
-            title: row.get(2)?,
-            tool: row.get(3)?,
-            environment: row.get(4)?,
-            category: row.get(5)?,
-            description: row.get(6)?,
-            template: row.get(7)?,
+            title: row.get(1)?,
+            tool: row.get(2)?,
+            environment: row.get(3)?,
+            category: row.get(4)?,
+            description: row.get(5)?,
+            template: row.get(6)?,
             tags: if tags.is_empty() {
                 Vec::new()
             } else {
@@ -125,7 +122,7 @@ pub fn get_snippets(database_path: &Path) -> Result<Vec<Snippet>> {
                     .map(|tag| tag.trim().to_string())
                     .collect()
             },
-            created_at: row.get(9)?,
+            created_at: row.get(8)?,
         })
     })?;
 
@@ -141,7 +138,6 @@ pub fn get_snippets(database_path: &Path) -> Result<Vec<Snippet>> {
 pub fn update_snippet(
     database_path: &Path,
     id: i64,
-    snippet_type: &str,
     title: &str,
     tool: &str,
     environment: &str,
@@ -156,18 +152,16 @@ pub fn update_snippet(
         "
         UPDATE snippets
         SET
-            snippet_type = ?1,
-            title = ?2,
-            tool = ?3,
-            environment = ?4,
-            category = ?5,
-            description = ?6,
-            template = ?7,
-            tags = ?8
-        WHERE id = ?9
+            title = ?1,
+            tool = ?2,
+            environment = ?3,
+            category = ?4,
+            description = ?5,
+            template = ?6,
+            tags = ?7
+        WHERE id = ?8
         ",
         (
-            snippet_type,
             title,
             tool,
             environment,

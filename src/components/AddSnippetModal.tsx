@@ -2,22 +2,23 @@ import { useState } from "react";
 
 type AddSnippetModalProps = {
     onClose: () => void;
-    onAnalyze: (type: string, content: string) => void;
+    onAnalyze: (content: string) => void;
 };
 
 export default function AddSnippetModal({
     onClose,
     onAnalyze,
 }: AddSnippetModalProps) {
-    const [type, setType] = useState("cli");
     const [content, setContent] = useState("");
 
     const handleAnalyze = () => {
-        if (!content.trim()) {
+        const trimmedContent = content.trim();
+
+        if (!trimmedContent) {
             return;
         }
 
-        onAnalyze(type, content.trim());
+        onAnalyze(trimmedContent);
     };
 
     return (
@@ -42,19 +43,6 @@ export default function AddSnippetModal({
                 </div>
 
                 <div className="form-group">
-                    <label htmlFor="snippet-type">Type</label>
-
-                    <select
-                        id="snippet-type"
-                        value={type}
-                        onChange={(event) => setType(event.target.value)}
-                    >
-                        <option value="cli">CLI Command</option>
-                        <option value="sql">SQL Query</option>
-                    </select>
-                </div>
-
-                <div className="form-group">
                     <label htmlFor="snippet-content">
                         Command or Query
                     </label>
@@ -62,12 +50,10 @@ export default function AddSnippetModal({
                     <textarea
                         id="snippet-content"
                         value={content}
-                        onChange={(event) => setContent(event.target.value)}
-                        placeholder={
-                            type === "sql"
-                                ? "SELECT * FROM users WHERE..."
-                                : "kubectl get pods -n..."
+                        onChange={(event) =>
+                            setContent(event.target.value)
                         }
+                        placeholder="kubectl get pods -n..."
                         autoFocus
                     />
 
