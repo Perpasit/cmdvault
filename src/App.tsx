@@ -5,8 +5,16 @@ import Sidebar from "./components/Sidebar";
 import SearchBar from "./components/SearchBar";
 import SnippetCard from "./components/SnippetCard";
 import { snippets } from "./data/mockSnippets";
+import AddSnippetModal from "./components/AddSnippetModal";
+import ReviewSnippet from "./components/ReviewSnippet";
+
+type DraftSnippet = {
+  type: string;
+  content: string;
+};
 
 function App() {
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [search, setSearch] = useState("");
 
   const filteredSnippets = useMemo(() => {
@@ -29,6 +37,34 @@ function App() {
     });
   }, [search]);
 
+  const handleAnalyze = (type: string, content: string) => {
+    setDraftSnippet({
+      type,
+      content,
+    });
+
+    setIsAddOpen(false);
+  };
+
+  const handleSaveSnippet = () => {
+    console.log("Save snippet");
+    setDraftSnippet(null);
+  };
+
+  const [draftSnippet, setDraftSnippet] =
+    useState<DraftSnippet | null>(null);
+
+  if (draftSnippet) {
+    return (
+      <ReviewSnippet
+        type={draftSnippet.type}
+        content={draftSnippet.content}
+        onBack={() => setDraftSnippet(null)}
+        onSave={handleSaveSnippet}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <Sidebar />
@@ -37,7 +73,10 @@ function App() {
         <header className="topbar">
           <SearchBar value={search} onChange={setSearch} />
 
-          <button className="add-button">
+          <button
+            className="add-button"
+            onClick={() => setIsAddOpen(true)}
+          >
             + Add Snippet
           </button>
         </header>
@@ -87,6 +126,13 @@ function App() {
           )}
         </section>
       </main>
+
+      {isAddOpen && (
+        <AddSnippetModal
+          onClose={() => setIsAddOpen(false)}
+          onAnalyze={handleAnalyze}
+        />
+      )}
     </div>
   );
 }
