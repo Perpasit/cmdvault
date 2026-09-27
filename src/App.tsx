@@ -6,6 +6,7 @@ import SearchBar from "./components/SearchBar";
 import SnippetCard from "./components/SnippetCard";
 import AddSnippetModal from "./components/AddSnippetModal";
 import ReviewSnippet from "./components/ReviewSnippet";
+import SnippetDetail from "./components/SnippetDetail";
 
 import type { Snippet } from "./data/mockSnippets";
 import { invoke } from "@tauri-apps/api/core";
@@ -33,10 +34,13 @@ function App() {
   const [snippetList, setSnippetList] = useState<Snippet[]>([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [search, setSearch] = useState("");
+
   const [draftSnippet, setDraftSnippet] =
     useState<DraftSnippet | null>(null);
 
-  // Load snippets from SQLite when CmdVault starts
+  const [selectedSnippet, setSelectedSnippet] =
+    useState<Snippet | null>(null);
+
   useEffect(() => {
     const loadSnippets = async () => {
       try {
@@ -155,6 +159,15 @@ function App() {
     }
   };
 
+  if (selectedSnippet) {
+    return (
+      <SnippetDetail
+        snippet={selectedSnippet}
+        onBack={() => setSelectedSnippet(null)}
+      />
+    );
+  }
+
   if (draftSnippet) {
     return (
       <ReviewSnippet
@@ -225,6 +238,7 @@ function App() {
             <SnippetCard
               key={snippet.id}
               snippet={snippet}
+              onOpen={setSelectedSnippet}
             />
           ))}
 

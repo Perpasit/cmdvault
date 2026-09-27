@@ -690,3 +690,150 @@
     grid-column: 2;
   }
 }
+
+.detail-page {
+  width: 100%;
+  height: 100vh;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.detail-container {
+  width: min(760px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.detail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 18px;
+  margin-bottom: 26px;
+}
+
+.detail-heading h1 {
+  margin: 0 0 5px;
+  font-size: 24px;
+  letter-spacing: -0.5px;
+}
+
+.detail-heading p {
+  margin: 0;
+  color: #888;
+  font-size: 12px;
+}
+
+.snippet-type-badge {
+  padding: 5px 8px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: #fafafa;
+  color: #666;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.detail-section {
+  padding: 20px 0;
+  border-top: 1px solid #eee;
+}
+
+.detail-section h2 {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.detail-description,
+.detail-value {
+  margin: 0;
+  color: #555;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-tags span {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: #fafafa;
+  color: #666;
+  font-size: 10px;
+}
+
+.snippet-card {
+  cursor: pointer;
+}
+
+.detail-section-heading {
+  margin-bottom: 14px;
+}
+
+.detail-section-heading h2 {
+  margin-bottom: 4px;
+}
+
+.detail-section-heading p {
+  margin: 0;
+  color: #888;
+  font-size: 11px;
+}
+
+.variable-input-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.variable-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.variable-input-group label {
+  color: #444;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.variable-input-group input {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d8d8d8;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+  outline: none;
+}
+
+.variable-input-group input:focus {
+  border-color: #777;
+}
+
+.preview-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 12px;
+}
+
+.preview-heading h2 {
+  margin-bottom: 4px;
+}
+
+.preview-heading p {
+  margin: 0;
+  color: #888;
+  font-size: 11px;
+}
