@@ -4,15 +4,21 @@ import {
 } from "react";
 
 import type { Snippet } from "../data/mockSnippets";
+import type { Collection } from "./Sidebar";
 import CreatableSelect from "./CreatableSelect";
 
 type EditSnippetProps = {
     snippet: Snippet;
 
+    collections: Collection[];
+
+    selectedCollectionIds: number[];
+
     onCancel: () => void;
 
     onSave: (
-        snippet: Snippet
+        snippet: Snippet,
+        collectionIds: number[]
     ) => void;
 
     toolOptions: string[];
@@ -26,6 +32,8 @@ type EditSnippetProps = {
 
 export default function EditSnippet({
     snippet,
+    collections,
+    selectedCollectionIds,
     onCancel,
     onSave,
     toolOptions,
@@ -70,6 +78,13 @@ export default function EditSnippet({
         useState(
             snippet.tags.join(", ")
         );
+
+    const [
+        collectionIds,
+        setCollectionIds,
+    ] = useState<number[]>(
+        selectedCollectionIds
+    );
 
     /*
      * Category options depend
@@ -126,6 +141,34 @@ export default function EditSnippet({
         }
     };
 
+    /*
+     * Select / unselect Collection
+     */
+    const toggleCollection = (
+        collectionId: number
+    ) => {
+        setCollectionIds(
+            (current) => {
+                if (
+                    current.includes(
+                        collectionId
+                    )
+                ) {
+                    return current.filter(
+                        (id) =>
+                            id !==
+                            collectionId
+                    );
+                }
+
+                return [
+                    ...current,
+                    collectionId,
+                ];
+            }
+        );
+    };
+
     const handleSave = () => {
         if (
             !title.trim() ||
@@ -134,34 +177,37 @@ export default function EditSnippet({
             return;
         }
 
-        onSave({
-            ...snippet,
+        onSave(
+            {
+                ...snippet,
 
-            title:
-                title.trim(),
+                title:
+                    title.trim(),
 
-            tool:
-                tool.trim(),
+                tool:
+                    tool.trim(),
 
-            environment:
-                environment.trim(),
+                environment:
+                    environment.trim(),
 
-            category:
-                category.trim(),
+                category:
+                    category.trim(),
 
-            description:
-                description.trim(),
+                description:
+                    description.trim(),
 
-            template:
-                template.trim(),
+                template:
+                    template.trim(),
 
-            tags: tags
-                .split(",")
-                .map((tag) =>
-                    tag.trim()
-                )
-                .filter(Boolean),
-        });
+                tags: tags
+                    .split(",")
+                    .map((tag) =>
+                        tag.trim()
+                    )
+                    .filter(Boolean),
+            },
+            collectionIds
+        );
     };
 
     return (
@@ -181,7 +227,9 @@ export default function EditSnippet({
                         </h1>
 
                         <p>
-                            Update snippet information and
+                            Update snippet
+                            information,
+                            collections and
                             template.
                         </p>
                     </div>
@@ -189,17 +237,22 @@ export default function EditSnippet({
 
                 <section className="detail-section">
                     <div className="variable-input-list">
-
                         <div className="variable-input-group">
                             <label>
                                 Title
                             </label>
 
                             <input
-                                value={title}
-                                onChange={(event) =>
+                                value={
+                                    title
+                                }
+                                onChange={(
+                                    event
+                                ) =>
                                     setTitle(
-                                        event.target.value
+                                        event
+                                            .target
+                                            .value
                                     )
                                 }
                             />
@@ -211,7 +264,9 @@ export default function EditSnippet({
                             </label>
 
                             <CreatableSelect
-                                value={tool}
+                                value={
+                                    tool
+                                }
                                 onChange={
                                     handleToolChange
                                 }
@@ -272,9 +327,13 @@ export default function EditSnippet({
                                 value={
                                     description
                                 }
-                                onChange={(event) =>
+                                onChange={(
+                                    event
+                                ) =>
                                     setDescription(
-                                        event.target.value
+                                        event
+                                            .target
+                                            .value
                                     )
                                 }
                             />
@@ -289,9 +348,13 @@ export default function EditSnippet({
                                 value={
                                     template
                                 }
-                                onChange={(event) =>
+                                onChange={(
+                                    event
+                                ) =>
                                     setTemplate(
-                                        event.target.value
+                                        event
+                                            .target
+                                            .value
                                     )
                                 }
                                 rows={6}
@@ -300,27 +363,90 @@ export default function EditSnippet({
 
                         <div className="variable-input-group">
                             <label>
+                                Collections
+                            </label>
+
+                            {collections.length >
+                                0 ? (
+                                <>
+                                    <div className="collection-options">
+                                        {collections.map(
+                                            (
+                                                collection
+                                            ) => (
+                                                <label
+                                                    className="collection-option"
+                                                    key={
+                                                        collection.id
+                                                    }
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={collectionIds.includes(
+                                                            collection.id
+                                                        )}
+                                                        onChange={() =>
+                                                            toggleCollection(
+                                                                collection.id
+                                                            )
+                                                        }
+                                                    />
+
+                                                    <span>
+                                                        {
+                                                            collection.name
+                                                        }
+                                                    </span>
+                                                </label>
+                                            )
+                                        )}
+                                    </div>
+
+                                    <span className="form-hint">
+                                        A snippet
+                                        can belong
+                                        to multiple
+                                        collections.
+                                    </span>
+                                </>
+                            ) : (
+                                <span className="form-hint">
+                                    No collections
+                                    available.
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="variable-input-group">
+                            <label>
                                 Tags
                             </label>
 
                             <input
-                                value={tags}
-                                onChange={(event) =>
+                                value={
+                                    tags
+                                }
+                                onChange={(
+                                    event
+                                ) =>
                                     setTags(
-                                        event.target.value
+                                        event
+                                            .target
+                                            .value
                                     )
                                 }
                                 placeholder="kubernetes, logs, troubleshooting"
                             />
                         </div>
-
                     </div>
                 </section>
 
                 <div className="edit-actions">
                     <button
                         className="secondary-button"
-                        onClick={onCancel}
+                        onClick={
+                            onCancel
+                        }
                     >
                         Cancel
                     </button>

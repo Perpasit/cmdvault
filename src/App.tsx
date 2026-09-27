@@ -189,6 +189,11 @@ function App() {
     setSelectedSnippet,
   ] = useState<Snippet | null>(null);
 
+  const [
+    selectedSnippetCollections,
+    setSelectedSnippetCollections,
+  ] = useState<Collection[]>([]);
+
   const [isEditing, setIsEditing] =
     useState(false);
 
@@ -751,9 +756,13 @@ function App() {
    */
   const handleUpdateSnippet =
     async (
-      updatedSnippet: Snippet
+      updatedSnippet: Snippet,
+      collectionIds: number[]
     ) => {
       try {
+        /*
+         * Update snippet data
+         */
         await invoke(
           "update_snippet",
           {
@@ -778,6 +787,80 @@ function App() {
           }
         );
 
+        /*
+         * Current Collection IDs
+         */
+        const previousCollectionIds =
+          selectedSnippetCollections.map(
+            (collection) =>
+              collection.id
+          );
+
+        /*
+         * Collections that need
+         * to be added
+         */
+        const collectionIdsToAdd =
+          collectionIds.filter(
+            (collectionId) =>
+              !previousCollectionIds.includes(
+                collectionId
+              )
+          );
+
+        /*
+         * Collections that need
+         * to be removed
+         */
+        const collectionIdsToRemove =
+          previousCollectionIds.filter(
+            (collectionId) =>
+              !collectionIds.includes(
+                collectionId
+              )
+          );
+
+        /*
+         * Add new relationships
+         */
+        for (
+          const collectionId
+          of collectionIdsToAdd
+        ) {
+          await invoke(
+            "add_snippet_to_collection",
+            {
+              input: {
+                snippetId:
+                  updatedSnippet.id,
+                collectionId,
+              },
+            }
+          );
+        }
+
+        /*
+         * Remove old relationships
+         */
+        for (
+          const collectionId
+          of collectionIdsToRemove
+        ) {
+          await invoke(
+            "remove_snippet_from_collection",
+            {
+              input: {
+                snippetId:
+                  updatedSnippet.id,
+                collectionId,
+              },
+            }
+          );
+        }
+
+        /*
+         * Update frontend snippet
+         */
         setSnippetList(
           (current) =>
             current.map(
@@ -789,9 +872,72 @@ function App() {
             )
         );
 
+        /*
+         * Update selected snippet
+         */
         setSelectedSnippet(
           updatedSnippet
         );
+
+        /*
+         * Update Collections
+         * shown in Detail
+         */
+        const updatedCollections =
+          collectionList.filter(
+            (collection) =>
+              collectionIds.includes(
+                collection.id
+              )
+          );
+
+        setSelectedSnippetCollections(
+          updatedCollections
+        );
+
+        /*
+         * Keep current Collection
+         * filter in sync
+         */
+        if (
+          selectedCollection &&
+          collectionSnippetIds !==
+          null
+        ) {
+          const stillInSelectedCollection =
+            collectionIds.includes(
+              selectedCollection.id
+            );
+
+          setCollectionSnippetIds(
+            (current) => {
+              if (
+                current === null
+              ) {
+                return null;
+              }
+
+              if (
+                stillInSelectedCollection
+              ) {
+                return current.includes(
+                  updatedSnippet.id
+                )
+                  ? current
+                  : [
+                    ...current,
+                    updatedSnippet.id,
+                  ];
+              }
+
+              return current.filter(
+                (id) =>
+                  id !==
+                  updatedSnippet.id
+              );
+            }
+          );
+        }
 
         setIsEditing(false);
       } catch (error) {
@@ -840,6 +986,67 @@ function App() {
       }
     };
 
+
+  /*
+* Open Snippet Detail
+*/
+  const handleOpenSnippet =
+    async (snippet: Snippet) => {
+      try {
+        const matchedCollections =
+          await Promise.all(
+            collectionList.map(
+              async (
+                collection
+              ) => {
+                const snippetIds =
+                  await invoke<
+                    number[]
+                  >(
+                    "get_collection_snippet_ids",
+                    {
+                      collectionId:
+                        collection.id,
+                    }
+                  );
+
+                return snippetIds.includes(
+                  snippet.id
+                )
+                  ? collection
+                  : null;
+              }
+            )
+          );
+
+        setSelectedSnippetCollections(
+          matchedCollections.filter(
+            (
+              collection
+            ): collection is Collection =>
+              collection !==
+              null
+          )
+        );
+
+        setSelectedSnippet(
+          snippet
+        );
+      } catch (error) {
+        console.error(
+          "Failed to load snippet collections:",
+          error
+        );
+
+        setSelectedSnippetCollections(
+          []
+        );
+
+        setSelectedSnippet(
+          snippet
+        );
+      }
+    };
   /*
    * Edit
    */
@@ -851,6 +1058,15 @@ function App() {
       <EditSnippet
         snippet={
           selectedSnippet
+        }
+        collections={
+          collectionList
+        }
+        selectedCollectionIds={
+          selectedSnippetCollections.map(
+            (collection) =>
+              collection.id
+          )
         }
         onCancel={() =>
           setIsEditing(false)
@@ -881,11 +1097,18 @@ function App() {
           snippet={
             selectedSnippet
           }
-          onBack={() =>
+          collections={
+            selectedSnippetCollections
+          }
+          onBack={() => {
             setSelectedSnippet(
               null
-            )
-          }
+            );
+
+            setSelectedSnippetCollections(
+              []
+            );
+          }}
           onEdit={() =>
             setIsEditing(true)
           }
@@ -1126,7 +1349,7 @@ function App() {
                   snippet
                 }
                 onOpen={
-                  setSelectedSnippet
+                  handleOpenSnippet
                 }
               />
             )
