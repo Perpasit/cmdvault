@@ -137,3 +137,61 @@ pub fn get_snippets(database_path: &Path) -> Result<Vec<Snippet>> {
 
     Ok(snippets)
 }
+
+pub fn update_snippet(
+    database_path: &Path,
+    id: i64,
+    snippet_type: &str,
+    title: &str,
+    tool: &str,
+    environment: &str,
+    category: &str,
+    description: &str,
+    template: &str,
+    tags: &str,
+) -> Result<()> {
+    let connection = Connection::open(database_path)?;
+
+    connection.execute(
+        "
+        UPDATE snippets
+        SET
+            snippet_type = ?1,
+            title = ?2,
+            tool = ?3,
+            environment = ?4,
+            category = ?5,
+            description = ?6,
+            template = ?7,
+            tags = ?8
+        WHERE id = ?9
+        ",
+        (
+            snippet_type,
+            title,
+            tool,
+            environment,
+            category,
+            description,
+            template,
+            tags,
+            id,
+        ),
+    )?;
+
+    Ok(())
+}
+
+pub fn delete_snippet(
+    database_path: &Path,
+    id: i64,
+) -> Result<()> {
+    let connection = Connection::open(database_path)?;
+
+    connection.execute(
+        "DELETE FROM snippets WHERE id = ?1",
+        [id],
+    )?;
+
+    Ok(())
+}

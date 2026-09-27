@@ -16,6 +16,20 @@ struct CreateSnippetInput {
     created_at: String,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateSnippetInput {
+    id: i64,
+    snippet_type: String,
+    title: String,
+    tool: String,
+    environment: String,
+    category: String,
+    description: String,
+    template: String,
+    tags: Vec<String>,
+}
+
 #[tauri::command]
 fn create_snippet(
     app: tauri::AppHandle,
@@ -60,6 +74,53 @@ fn get_snippets(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn update_snippet(
+    app: tauri::AppHandle,
+    input: UpdateSnippetInput,
+) -> Result<(), String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+
+    let database_path = app_data_dir.join("cmdvault.db");
+    let tags = input.tags.join(",");
+
+    database::update_snippet(
+        &database_path,
+        input.id,
+        &input.snippet_type,
+        &input.title,
+        &input.tool,
+        &input.environment,
+        &input.category,
+        &input.description,
+        &input.template,
+        &tags,
+    )
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn delete_snippet(
+    app: tauri::AppHandle,
+    id: i64,
+) -> Result<(), String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+
+    let database_path = app_data_dir.join("cmdvault.db");
+
+    database::delete_snippet(
+        &database_path,
+        id,
+    )
+    .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -89,7 +150,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             create_snippet,
-            get_snippets
+            get_snippets,
+            update_snippet,
+            delete_snippet
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

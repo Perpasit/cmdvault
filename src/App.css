@@ -837,3 +837,172 @@
   color: #888;
   font-size: 11px;
 }
+
+.variable-input-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d8d8d8;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.variable-input-group textarea:focus {
+  border-color: #777;
+}
+
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 20px;
+}
+
+.detail-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.snippet-type-badge {
+  padding: 5px 9px;
+  border: 1px solid #e2e2e2;
+  border-radius: 5px;
+  background: #fafafa;
+  color: #666;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-action-button {
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: #555;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.detail-action-button:hover {
+  color: #111;
+}
+
+.delete-action {
+  color: #777;
+}
+
+.delete-action:hover {
+  color: #333;
+}
+
+.action-divider {
+  color: #ccc;
+  font-size: 12px;
+}
+
+.delete-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background: rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(1px);
+}
+
+.delete-modal {
+  width: 100%;
+  max-width: 390px;
+
+  padding: 22px;
+
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+
+  background: #fff;
+
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.delete-modal h2 {
+  margin: 0 0 14px;
+
+  color: #222;
+
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.delete-modal-description {
+  margin: 0 0 8px;
+
+  color: #777;
+
+  font-size: 12px;
+}
+
+.delete-snippet-name {
+  padding: 10px 12px;
+
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+
+  background: #fafafa;
+
+  color: #333;
+
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.delete-modal-warning {
+  margin: 10px 0 0;
+
+  color: #999;
+
+  font-size: 11px;
+}
+
+.delete-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+
+  gap: 8px;
+
+  margin-top: 22px;
+}
+
+.confirm-delete-button {
+  padding: 7px 14px;
+
+  border: 1px solid #333;
+  border-radius: 6px;
+
+  background: #222;
+
+  color: #fff;
+
+  font-size: 11px;
+
+  cursor: pointer;
+}
+
+.confirm-delete-button:hover {
+  background: #000;
+}

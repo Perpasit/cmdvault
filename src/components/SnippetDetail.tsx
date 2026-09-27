@@ -4,11 +4,15 @@ import type { Snippet } from "../data/mockSnippets";
 type SnippetDetailProps = {
     snippet: Snippet;
     onBack: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
 };
 
 export default function SnippetDetail({
     snippet,
     onBack,
+    onEdit,
+    onDelete,
 }: SnippetDetailProps) {
     const variableNames = useMemo(() => {
         const matches = snippet.template.matchAll(/\{\{([^{}]+)\}\}/g);
@@ -87,11 +91,31 @@ export default function SnippetDetail({
                         </p>
                     </div>
 
-                    <span className="snippet-type-badge">
-                        {snippet.type === "sql"
-                            ? "SQL Query"
-                            : "CLI Command"}
-                    </span>
+                    <div className="detail-heading-actions">
+                        <span className="snippet-type-badge">
+                            {snippet.type === "sql"
+                                ? "SQL Query"
+                                : "CLI Command"}
+                        </span>
+
+                        <div className="detail-actions">
+                            <button
+                                className="detail-action-button"
+                                onClick={onEdit}
+                            >
+                                Edit
+                            </button>
+
+                            <span className="action-divider">·</span>
+
+                            <button
+                                className="detail-action-button delete-action"
+                                onClick={onDelete}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {snippet.description && (

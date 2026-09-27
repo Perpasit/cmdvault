@@ -7,6 +7,8 @@ import SnippetCard from "./components/SnippetCard";
 import AddSnippetModal from "./components/AddSnippetModal";
 import ReviewSnippet from "./components/ReviewSnippet";
 import SnippetDetail from "./components/SnippetDetail";
+import EditSnippet from "./components/EditSnippet";
+import DeleteConfirmModal from "./components/DeleteConfirmModal";
 
 import type { Snippet } from "./data/mockSnippets";
 import { invoke } from "@tauri-apps/api/core";
@@ -40,6 +42,12 @@ function App() {
 
   const [selectedSnippet, setSelectedSnippet] =
     useState<Snippet | null>(null);
+
+  const [isEditing, setIsEditing] =
+    useState(false);
+
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] =
+    useState(false);
 
   useEffect(() => {
     const loadSnippets = async () => {
@@ -159,12 +167,96 @@ function App() {
     }
   };
 
+  const handleUpdateSnippet = async (
+    updatedSnippet: Snippet
+  ) => {
+    try {
+      await invoke("update_snippet", {
+        input: {
+          id: updatedSnippet.id,
+          snippetType: updatedSnippet.type,
+          title: updatedSnippet.title,
+          tool: updatedSnippet.tool,
+          environment: updatedSnippet.environment,
+          category: updatedSnippet.category,
+          description: updatedSnippet.description,
+          template: updatedSnippet.template,
+          tags: updatedSnippet.tags,
+        },
+      });
+
+      setSnippetList((current) =>
+        current.map((snippet) =>
+          snippet.id === updatedSnippet.id
+            ? updatedSnippet
+            : snippet
+        )
+      );
+
+      setSelectedSnippet(updatedSnippet);
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to update snippet:", error);
+    }
+  };
+
+  const handleDeleteSnippet = async (
+    snippet: Snippet
+  ) => {
+    try {
+      await invoke("delete_snippet", {
+        id: snippet.id,
+      });
+
+      setSnippetList((current) =>
+        current.filter(
+          (item) => item.id !== snippet.id
+        )
+      );
+
+      setIsDeleteConfirmOpen(false);
+      setSelectedSnippet(null);
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to delete snippet:", error);
+    }
+  };
+
+
+  if (selectedSnippet && isEditing) {
+    return (
+      <EditSnippet
+        snippet={selectedSnippet}
+        onCancel={() => setIsEditing(false)}
+        onSave={handleUpdateSnippet}
+      />
+    );
+  }
+
   if (selectedSnippet) {
     return (
-      <SnippetDetail
-        snippet={selectedSnippet}
-        onBack={() => setSelectedSnippet(null)}
-      />
+      <>
+        <SnippetDetail
+          snippet={selectedSnippet}
+          onBack={() => setSelectedSnippet(null)}
+          onEdit={() => setIsEditing(true)}
+          onDelete={() =>
+            setIsDeleteConfirmOpen(true)
+          }
+        />
+
+        {isDeleteConfirmOpen && (
+          <DeleteConfirmModal
+            snippetTitle={selectedSnippet.title}
+            onCancel={() =>
+              setIsDeleteConfirmOpen(false)
+            }
+            onConfirm={() =>
+              handleDeleteSnippet(selectedSnippet)
+            }
+          />
+        )}
+      </>
     );
   }
 
