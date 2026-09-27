@@ -606,18 +606,29 @@
 
 .variable-row {
   display: grid;
-  grid-template-columns: 20px minmax(120px, 1fr) 20px 1fr;
+  grid-template-columns:
+    20px minmax(0, 1fr) 24px minmax(0, 1fr) 36px;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 
-  padding: 9px 10px;
-
-  border: 1px solid #e5e5e5;
-  border-radius: 6px;
+  padding: 12px;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
 }
 
 .variable-row input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+
   margin: 0;
+  padding: 0;
+
+  cursor: pointer;
+  accent-color: #222222;
 }
 
 .variable-original {
@@ -1303,4 +1314,83 @@
 
 .collection-menu button.danger:hover {
   background: #fef3f2;
+}
+
+.analyze-error {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  margin-top: 16px;
+  padding: 12px 14px;
+
+  border: 1px solid #d6d6d6;
+  border-radius: 8px;
+
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.analyze-error span {
+  overflow-wrap: anywhere;
+}
+
+button:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.variable-original-input,
+.variable-name {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.variable-arrow {
+  text-align: center;
+  color: #888;
+}
+
+.variable-remove-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #d6d6d6;
+  border-radius: 6px;
+  background: transparent;
+
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.variable-remove-button:hover {
+  background: #f3f3f3;
+}
+
+.variable-remove-button:hover {
+  background: #f3f3f3;
+}
+
+.add-variable-button {
+  margin-top: 12px;
+  padding: 8px 12px;
+
+  border: 1px solid #d6d6d6;
+  border-radius: 6px;
+  background: transparent;
+
+  font: inherit;
+  cursor: pointer;
+}
+
+.add-variable-button:hover {
+  background: #f3f3f3;
 }

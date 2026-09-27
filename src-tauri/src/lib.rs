@@ -4,6 +4,170 @@ use tauri::Manager;
 
 /*
  * ============================================================
+ * Local AI
+ * ============================================================
+ */
+
+const OLLAMA_GENERATE_URL: &str =
+    "http://127.0.0.1:11434/api/generate";
+
+const OLLAMA_MODEL: &str =
+    "llama3.1:latest";
+
+#[derive(serde::Serialize)]
+struct OllamaGenerateRequest {
+    model: String,
+    prompt: String,
+    stream: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct OllamaGenerateResponse {
+    response: String,
+    done: bool,
+}
+
+/*
+ * ============================================================
+ * AI Analyze Schema
+ * ============================================================
+ */
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AnalyzeVariable {
+    name: String,
+    value: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AnalyzeResult {
+    title: String,
+    tool: String,
+    environment: String,
+    category: String,
+    description: String,
+    template: String,
+    variables: Vec<AnalyzeVariable>,
+    tags: Vec<String>,
+}
+
+fn build_analyze_prompt(content: &str) -> String {
+    format!(
+        r#"
+You are the local AI analyzer inside CmdVault.
+
+CmdVault is a developer tool for capturing and reusing engineering
+commands and SQL queries.
+
+Analyze the input and return ONLY valid JSON.
+Do not include markdown.
+Do not include ```json.
+Do not include explanations before or after the JSON.
+
+Return exactly this structure:
+
+{{
+  "title": "short descriptive title",
+  "tool": "tool name",
+  "environment": "execution environment",
+  "category": "short category",
+  "description": "short description of what the command or query does",
+  "template": "reusable version of the input using {{{{variable_name}}}} placeholders",
+  "variables": [
+    {{
+      "name": "variable_name",
+      "value": "original value"
+    }}
+  ],
+  "tags": [
+    "tag1",
+    "tag2"
+  ]
+}}
+
+Rules:
+
+1. Preserve the behavior and intent of the original input.
+
+2. The template must remain executable after all placeholders
+   are replaced with values.
+
+3. Replace values that are likely to change between uses with
+   {{{{variable_name}}}} placeholders.
+
+4. Good variable candidates include:
+   - Kubernetes pod names
+   - namespaces
+   - resource names
+   - subscription names
+   - resource groups
+   - file paths
+   - URLs
+   - host names
+   - ports
+   - IDs
+   - query values
+   - limits
+   - dates
+
+5. Do not replace command keywords, flags, SQL keywords,
+   operators, or other structural syntax with variables.
+
+6. Variable names must:
+   - use snake_case
+   - be descriptive
+   - contain no spaces
+   - not include the curly braces
+
+7. Every placeholder used in "template" must have exactly one
+   matching entry in "variables".
+
+8. Every variable value must be copied from the original input.
+   Do not invent values.
+
+9. Prefer these tool names when applicable:
+   Kubernetes
+   Terraform
+   Azure CLI
+   Azure PowerShell
+   AWS CLI
+   Docker
+   Git
+   SQL
+
+10. Prefer these environments when applicable:
+    Bash / Shell
+    PowerShell
+    Windows CMD
+    SQL
+    Generic CLI
+
+11. Keep the title concise.
+
+12. Keep the description concise and factual.
+
+13. Tags should be short, useful search terms.
+
+14. If no useful variables exist, return:
+    "variables": []
+
+15. Never execute the input.
+    Only analyze it.
+
+Input:
+
+---BEGIN INPUT---
+{}
+---END INPUT---
+"#,
+        content
+    )
+}
+
+/*
+ * ============================================================
  * Inputs
  * ============================================================
  */
@@ -70,6 +234,185 @@ fn get_database_path(
         .map_err(|error| error.to_string())?;
 
     Ok(app_data_dir.join("cmdvault.db"))
+}
+
+/*
+ * ============================================================
+ * Local AI Commands
+ * ============================================================
+ */
+
+#[tauri::command]
+fn test_ai_connection() -> Result<String, String> {
+    let client =
+        reqwest::blocking::Client::new();
+
+    let request =
+        OllamaGenerateRequest {
+            model:
+                OLLAMA_MODEL.to_string(),
+            prompt:
+                "Reply with exactly: CmdVault AI connected"
+                    .to_string(),
+            stream: false,
+        };
+
+    let response = client
+        .post(OLLAMA_GENERATE_URL)
+        .json(&request)
+        .send()
+        .map_err(|error| {
+            format!(
+                "Failed to connect to local AI: {}",
+                error
+            )
+        })?;
+
+    if !response.status().is_success() {
+        return Err(
+            format!(
+                "Local AI returned HTTP {}",
+                response.status()
+            )
+        );
+    }
+
+    let result =
+        response
+            .json::<OllamaGenerateResponse>()
+            .map_err(|error| {
+                format!(
+                    "Failed to read local AI response: {}",
+                    error
+                )
+            })?;
+
+    if !result.done {
+        return Err(
+            "Local AI response did not complete."
+                .to_string(),
+        );
+    }
+
+    Ok(result.response.trim().to_string())
+}
+
+#[tauri::command]
+fn analyze_snippet(
+    content: String,
+) -> Result<AnalyzeResult, String> {
+    let trimmed_content =
+        content.trim();
+
+    if trimmed_content.is_empty() {
+        return Err(
+            "Snippet content cannot be empty."
+                .to_string(),
+        );
+    }
+
+    /*
+     * Build prompt
+     */
+    let prompt =
+        build_analyze_prompt(
+            trimmed_content,
+        );
+
+    /*
+     * Prepare Ollama request
+     */
+    let request =
+        OllamaGenerateRequest {
+            model:
+                OLLAMA_MODEL.to_string(),
+            prompt,
+            stream: false,
+        };
+
+    /*
+     * Send request to local Ollama
+     */
+    let client =
+    reqwest::blocking::Client::builder()
+        .timeout(
+            std::time::Duration::from_secs(120)
+        )
+        .build()
+        .map_err(|error| {
+            format!(
+                "Failed to create HTTP client: {}",
+                error
+            )
+        })?;
+
+    let response = client
+        .post(OLLAMA_GENERATE_URL)
+        .json(&request)
+        .send()
+        .map_err(|error| {
+            format!(
+                "Failed to connect to local AI:\n{:#?}",
+                error
+            )
+        })?;
+
+    /*
+     * Check HTTP status
+     */
+    if !response.status().is_success() {
+        return Err(
+            format!(
+                "Local AI returned HTTP {}",
+                response.status()
+            )
+        );
+    }
+
+    /*
+     * Read Ollama response
+     */
+    let ollama_result =
+        response
+            .json::<OllamaGenerateResponse>()
+            .map_err(|error| {
+                format!(
+                    "Failed to read local AI response: {}",
+                    error
+                )
+            })?;
+
+    if !ollama_result.done {
+        return Err(
+            "Local AI response did not complete."
+                .to_string(),
+        );
+    }
+
+    /*
+     * Ollama returns the generated JSON
+     * inside the "response" field.
+     */
+    let ai_output =
+        ollama_result.response.trim();
+
+    /*
+     * Parse generated JSON into
+     * our AnalyzeResult schema.
+     */
+    let result =
+        serde_json::from_str::<
+            AnalyzeResult
+        >(ai_output)
+        .map_err(|error| {
+            format!(
+                "Failed to parse AI response as JSON: {}\n\nAI response:\n{}",
+                error,
+                ai_output
+            )
+        })?;
+
+    Ok(result)
 }
 
 /*
@@ -385,7 +728,13 @@ pub fn run() {
                 add_snippet_to_collection,
                 remove_snippet_from_collection,
                 get_snippet_collections,
-                get_collection_snippet_ids
+                get_collection_snippet_ids,
+
+                /*
+                * Local AI
+                */
+                test_ai_connection,
+                analyze_snippet
             ],
         )
         .run(

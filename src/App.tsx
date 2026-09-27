@@ -23,8 +23,25 @@ import RenameCollectionModal from "./components/RenameCollectionModal";
 import type { Snippet } from "./data/mockSnippets";
 import { invoke } from "@tauri-apps/api/core";
 
+type AnalyzeVariable = {
+  name: string;
+  value: string;
+};
+
+type AnalyzeResult = {
+  title: string;
+  tool: string;
+  environment: string;
+  category: string;
+  description: string;
+  template: string;
+  variables: AnalyzeVariable[];
+  tags: string[];
+};
+
 type DraftSnippet = {
   content: string;
+  analysis: AnalyzeResult;
 };
 
 type DatabaseSnippet = {
@@ -851,14 +868,78 @@ function App() {
       collectionSnippetIds,
     ]);
 
+
+  /*
+* Test Local AI Connection
+*/
+  const handleTestAiConnection =
+    async () => {
+      try {
+        const response =
+          await invoke<string>(
+            "test_ai_connection"
+          );
+
+        alert(
+          `Local AI connected:\n${response}`
+        );
+      } catch (error) {
+        console.error(
+          "Failed to connect to Local AI:",
+          error
+        );
+
+        alert(
+          `Local AI connection failed:\n${error}`
+        );
+      }
+    };
   /*
    * Add -> Analyze
    */
-  const handleAnalyze = (
+  const handleAnalyze =
+    async (content: string) => {
+      const analysis =
+        await invoke<AnalyzeResult>(
+          "analyze_snippet",
+          {
+            content,
+          }
+        );
+
+      console.log(
+        "AI analysis:",
+        analysis
+      );
+
+      setDraftSnippet({
+        content,
+        analysis,
+      });
+
+      setIsAddOpen(false);
+    };
+
+  /*
+* Add without Local AI
+*/
+  const handleAddManually = (
     content: string
   ) => {
+    const analysis: AnalyzeResult = {
+      title: "",
+      tool: "",
+      environment: "",
+      category: "",
+      description: "",
+      template: content,
+      variables: [],
+      tags: [],
+    };
+
     setDraftSnippet({
       content,
+      analysis,
     });
 
     setIsAddOpen(false);
@@ -1340,6 +1421,9 @@ function App() {
         content={
           draftSnippet.content
         }
+        analysis={
+          draftSnippet.analysis
+        }
         onBack={() =>
           setDraftSnippet(null)
         }
@@ -1402,6 +1486,15 @@ function App() {
               setSearch
             }
           />
+
+          <button
+            className="secondary-button"
+            onClick={
+              handleTestAiConnection
+            }
+          >
+            Test AI
+          </button>
 
           <button
             className="add-button"
@@ -1564,12 +1657,13 @@ function App() {
       {isAddOpen && (
         <AddSnippetModal
           onClose={() =>
-            setIsAddOpen(
-              false
-            )
+            setIsAddOpen(false)
           }
           onAnalyze={
             handleAnalyze
+          }
+          onAddManually={
+            handleAddManually
           }
         />
       )}

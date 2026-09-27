@@ -14,8 +14,25 @@ type SuggestedVariable = {
     enabled: boolean;
 };
 
+type AnalyzeVariable = {
+    name: string;
+    value: string;
+};
+
+type AnalyzeResult = {
+    title: string;
+    tool: string;
+    environment: string;
+    category: string;
+    description: string;
+    template: string;
+    variables: AnalyzeVariable[];
+    tags: string[];
+};
+
 type ReviewSnippetProps = {
     content: string;
+    analysis: AnalyzeResult;
 
     onBack: () => void;
 
@@ -40,6 +57,7 @@ type ReviewSnippetProps = {
 
 export default function ReviewSnippet({
     content,
+    analysis,
     onBack,
     onSave,
     toolOptions,
@@ -48,28 +66,36 @@ export default function ReviewSnippet({
     collections,
 }: ReviewSnippetProps) {
     const [title, setTitle] =
-        useState("Untitled Snippet");
+        useState(analysis.title);
 
     const [tool, setTool] =
-        useState("");
+        useState(analysis.tool);
 
     const [
         environment,
         setEnvironment,
-    ] = useState("");
+    ] = useState(
+        analysis.environment
+    );
 
     const [
         category,
         setCategory,
-    ] = useState("");
+    ] = useState(
+        analysis.category
+    );
 
     const [
         description,
         setDescription,
-    ] = useState("");
+    ] = useState(
+        analysis.description
+    );
 
     const [tags, setTags] =
-        useState("");
+        useState(
+            analysis.tags.join(", ")
+        );
 
     const [
         selectedCollectionIds,
@@ -77,47 +103,29 @@ export default function ReviewSnippet({
     ] = useState<number[]>([]);
 
     /*
-     * Mock Suggested Variables
+     * AI Suggested Variables
      *
-     * Local AI will replace this later.
+     * Manual mode will start with
+     * an empty array.
      */
     const [
         variables,
         setVariables,
-    ] = useState<
-        SuggestedVariable[]
-    >([
-        {
-            id: 1,
-            original:
-                "payment-api-7db8d",
-            name: "pod_name",
-            enabled: true,
-        },
-        {
-            id: 2,
-            original:
-                "payment-dev",
-            name: "namespace",
-            enabled: true,
-        },
-        {
-            id: 3,
-            original: "100",
-            name: "tail_lines",
-            enabled: true,
-        },
-    ]);
+    ] = useState<SuggestedVariable[]>(
+        analysis.variables.map(
+            (variable, index) => ({
+                id: index + 1,
+                original:
+                    variable.value,
+                name:
+                    variable.name,
+                enabled: true,
+            })
+        )
+    );
 
     /*
-     * Dynamic Categories.
-     *
-     * No Tool:
-     * show all available Categories.
-     *
-     * Tool selected:
-     * show Categories related
-     * to that Tool.
+     * Dynamic Categories
      */
     const categoryOptions =
         useMemo(
@@ -133,25 +141,35 @@ export default function ReviewSnippet({
 
     /*
      * Reusable Template
+     *
+     * Start from the original content.
+     * Enabled variables replace their
+     * original values with {{name}}.
      */
     const template =
         useMemo(() => {
-            let result =
-                content;
+            let result = content;
 
             variables.forEach(
                 (variable) => {
+                    const original =
+                        variable.original.trim();
+
+                    const name =
+                        variable.name.trim();
+
                     if (
                         variable.enabled &&
-                        variable.name.trim()
+                        original &&
+                        name
                     ) {
                         result =
                             result
                                 .split(
-                                    variable.original
+                                    original
                                 )
                                 .join(
-                                    `{{${variable.name.trim()}}}`
+                                    `{{${name}}}`
                                 );
                     }
                 }
@@ -163,15 +181,16 @@ export default function ReviewSnippet({
             variables,
         ]);
 
+    /*
+     * Enable / Disable Variable
+     */
     const toggleVariable = (
         id: number
     ) => {
         setVariables(
             (current) =>
                 current.map(
-                    (
-                        variable
-                    ) =>
+                    (variable) =>
                         variable.id ===
                             id
                             ? {
@@ -184,6 +203,9 @@ export default function ReviewSnippet({
         );
     };
 
+    /*
+     * Rename Variable
+     */
     const renameVariable = (
         id: number,
         name: string
@@ -191,9 +213,7 @@ export default function ReviewSnippet({
         setVariables(
             (current) =>
                 current.map(
-                    (
-                        variable
-                    ) =>
+                    (variable) =>
                         variable.id ===
                             id
                             ? {
@@ -201,6 +221,78 @@ export default function ReviewSnippet({
                                 name,
                             }
                             : variable
+                )
+        );
+    };
+
+    /*
+     * Change Original Value
+     *
+     * Useful for manually-created
+     * variables or correcting an
+     * AI suggestion.
+     */
+    const updateVariableOriginal = (
+        id: number,
+        original: string
+    ) => {
+        setVariables(
+            (current) =>
+                current.map(
+                    (variable) =>
+                        variable.id ===
+                            id
+                            ? {
+                                ...variable,
+                                original,
+                            }
+                            : variable
+                )
+        );
+    };
+
+    /*
+     * Add Variable Manually
+     */
+    const addVariable = () => {
+        setVariables(
+            (current) => {
+                const nextId =
+                    current.length > 0
+                        ? Math.max(
+                            ...current.map(
+                                (
+                                    variable
+                                ) =>
+                                    variable.id
+                            )
+                        ) + 1
+                        : 1;
+
+                return [
+                    ...current,
+                    {
+                        id: nextId,
+                        original: "",
+                        name: "",
+                        enabled: true,
+                    },
+                ];
+            }
+        );
+    };
+
+    /*
+     * Remove Variable
+     */
+    const removeVariable = (
+        id: number
+    ) => {
+        setVariables(
+            (current) =>
+                current.filter(
+                    (variable) =>
+                        variable.id !== id
                 )
         );
     };
@@ -219,6 +311,9 @@ export default function ReviewSnippet({
         setCategory("");
     };
 
+    /*
+     * Collections
+     */
     const toggleCollection = (
         collectionId: number
     ) => {
@@ -239,6 +334,9 @@ export default function ReviewSnippet({
         );
     };
 
+    /*
+     * Save
+     */
     const handleSave = () => {
         const parsedTags =
             tags
@@ -272,24 +370,19 @@ export default function ReviewSnippet({
                     <div>
                         <button
                             className="back-link"
-                            onClick={
-                                onBack
-                            }
+                            onClick={onBack}
                         >
                             ← Back
                         </button>
 
                         <h1>
-                            Review &
-                            Edit
+                            Review & Edit
                         </h1>
 
                         <p>
                             Review the
-                            suggestions
-                            before
-                            saving this
-                            snippet.
+                            suggestions before
+                            saving this snippet.
                         </p>
                     </div>
 
@@ -412,23 +505,33 @@ export default function ReviewSnippet({
 
                             <textarea
                                 className="description-input"
-                                value={description}
-                                onChange={(event) =>
+                                value={
+                                    description
+                                }
+                                onChange={(
+                                    event
+                                ) =>
                                     setDescription(
-                                        event.target.value
+                                        event
+                                            .target
+                                            .value
                                     )
                                 }
                             />
                         </div>
+
                         <div className="form-group full-width">
                             <label>
                                 Collections
                             </label>
 
-                            {collections.length > 0 ? (
+                            {collections.length >
+                                0 ? (
                                 <div className="collection-options">
                                     {collections.map(
-                                        (collection) => (
+                                        (
+                                            collection
+                                        ) => (
                                             <label
                                                 className="collection-option"
                                                 key={
@@ -437,11 +540,9 @@ export default function ReviewSnippet({
                                             >
                                                 <input
                                                     type="checkbox"
-                                                    checked={
-                                                        selectedCollectionIds.includes(
-                                                            collection.id
-                                                        )
-                                                    }
+                                                    checked={selectedCollectionIds.includes(
+                                                        collection.id
+                                                    )}
                                                     onChange={() =>
                                                         toggleCollection(
                                                             collection.id
@@ -460,7 +561,8 @@ export default function ReviewSnippet({
                                 </div>
                             ) : (
                                 <span className="form-hint">
-                                    No collections yet.
+                                    No collections
+                                    yet.
                                 </span>
                             )}
                         </div>
@@ -488,13 +590,11 @@ export default function ReviewSnippet({
                             </h2>
 
                             <p>
-                                Choose
-                                which
-                                values
-                                should
-                                become
-                                reusable
-                                variables.
+                                Choose which
+                                values should
+                                become reusable
+                                variables, or
+                                add your own.
                             </p>
                         </div>
                     </div>
@@ -524,11 +624,23 @@ export default function ReviewSnippet({
                                             }
                                         />
 
-                                        <code className="variable-original">
-                                            {
+                                        <input
+                                            className="variable-original-input"
+                                            value={
                                                 variable.original
                                             }
-                                        </code>
+                                            onChange={(
+                                                event
+                                            ) =>
+                                                updateVariableOriginal(
+                                                    variable.id,
+                                                    event
+                                                        .target
+                                                        .value
+                                                )
+                                            }
+                                            placeholder="Original value"
+                                        />
 
                                         <span className="variable-arrow">
                                             →
@@ -552,31 +664,52 @@ export default function ReviewSnippet({
                                                         .value
                                                 )
                                             }
+                                            placeholder="variable_name"
                                         />
+
+                                        <button
+                                            type="button"
+                                            className="variable-remove-button"
+                                            onClick={() =>
+                                                removeVariable(
+                                                    variable.id
+                                                )
+                                            }
+                                            aria-label="Remove variable"
+                                            title="Remove variable"
+                                        >
+                                            ×
+                                        </button>
                                     </div>
                                 )
                             )}
                         </div>
                     ) : (
                         <p className="no-variables">
-                            No
-                            variables
-                            suggested.
+                            No variables added
+                            yet.
                         </p>
                     )}
+
+                    <button
+                        type="button"
+                        className="add-variable-button"
+                        onClick={
+                            addVariable
+                        }
+                    >
+                        + Add Variable
+                    </button>
                 </section>
 
                 <section className="review-section">
                     <h2>
-                        Reusable
-                        Template
+                        Reusable Template
                     </h2>
 
                     <pre className="review-code template-preview">
                         <code>
-                            {
-                                template
-                            }
+                            {template}
                         </code>
                     </pre>
                 </section>
@@ -584,9 +717,7 @@ export default function ReviewSnippet({
                 <div className="review-actions">
                     <button
                         className="secondary-button"
-                        onClick={
-                            onBack
-                        }
+                        onClick={onBack}
                     >
                         Back
                     </button>
@@ -598,11 +729,12 @@ export default function ReviewSnippet({
                         }
                         disabled={
                             !title.trim() ||
-                            !template.trim()
+                            !tool.trim() ||
+                            !environment.trim() ||
+                            !category.trim()
                         }
                     >
-                        Save
-                        Snippet
+                        Save Snippet
                     </button>
                 </div>
             </div>
