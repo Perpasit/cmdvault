@@ -73,10 +73,11 @@ export default function Sidebar({
             <nav className="sidebar-nav">
                 <button
                     className={`nav-item ${selectedCollectionId === null &&
-                        !isSettingsActive
-                        ? "active"
-                        : ""
+                            !isSettingsActive
+                            ? "active"
+                            : ""
                         }`}
+                    onClick={onSelectLibrary}
                 >
                     Library
                 </button>
@@ -110,10 +111,10 @@ export default function Sidebar({
                         >
                             <button
                                 className={`nav-item collection-nav-button ${selectedCollectionId ===
-                                        collection.id &&
-                                        !isSettingsActive
-                                        ? "active"
-                                        : ""
+                                    collection.id &&
+                                    !isSettingsActive
+                                    ? "active"
+                                    : ""
                                     }`}
                                 onClick={() => {
                                     setOpenMenuId(
