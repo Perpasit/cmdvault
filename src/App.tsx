@@ -1,27 +1,70 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
 import Sidebar from "./components/Sidebar";
 import SearchBar from "./components/SearchBar";
 import SnippetCard from "./components/SnippetCard";
-import {
-  snippets as initialSnippets,
-  type Snippet,
-} from "./data/mockSnippets";
 import AddSnippetModal from "./components/AddSnippetModal";
 import ReviewSnippet from "./components/ReviewSnippet";
+
+import type { Snippet } from "./data/mockSnippets";
+import { invoke } from "@tauri-apps/api/core";
 
 type DraftSnippet = {
   type: string;
   content: string;
 };
 
+type DatabaseSnippet = {
+  id: number;
+  snippetType: "cli" | "sql";
+  title: string;
+  tool: string;
+  environment: string;
+  category: string;
+  description: string;
+  template: string;
+  tags: string[];
+  createdAt: string;
+};
+
 function App() {
   const [sortBy, setSortBy] = useState("newest");
-  const [snippetList, setSnippetList] =
-    useState<Snippet[]>(initialSnippets);
+  const [snippetList, setSnippetList] = useState<Snippet[]>([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [draftSnippet, setDraftSnippet] =
+    useState<DraftSnippet | null>(null);
+
+  // Load snippets from SQLite when CmdVault starts
+  useEffect(() => {
+    const loadSnippets = async () => {
+      try {
+        const databaseSnippets =
+          await invoke<DatabaseSnippet[]>("get_snippets");
+
+        const loadedSnippets: Snippet[] =
+          databaseSnippets.map((snippet) => ({
+            id: snippet.id,
+            type: snippet.snippetType,
+            title: snippet.title,
+            tool: snippet.tool,
+            environment: snippet.environment,
+            category: snippet.category,
+            description: snippet.description,
+            template: snippet.template,
+            tags: snippet.tags,
+            createdAt: snippet.createdAt,
+          }));
+
+        setSnippetList(loadedSnippets);
+      } catch (error) {
+        console.error("Failed to load snippets:", error);
+      }
+    };
+
+    loadSnippets();
+  }, []);
 
   const filteredSnippets = useMemo(() => {
     const keyword = search.toLowerCase().trim();
@@ -63,7 +106,10 @@ function App() {
     return result;
   }, [search, snippetList, sortBy]);
 
-  const handleAnalyze = (type: string, content: string) => {
+  const handleAnalyze = (
+    type: string,
+    content: string
+  ) => {
     setDraftSnippet({
       type,
       content,
@@ -72,25 +118,42 @@ function App() {
     setIsAddOpen(false);
   };
 
-  const handleSaveSnippet = (
+  const handleSaveSnippet = async (
     snippet: Omit<Snippet, "id" | "createdAt">
   ) => {
-    const newSnippet: Snippet = {
-      ...snippet,
-      id: Date.now(),
-      createdAt: new Date().toISOString(),
-    };
+    const createdAt = new Date().toISOString();
 
-    setSnippetList((current) => [
-      newSnippet,
-      ...current,
-    ]);
+    try {
+      const id = await invoke<number>("create_snippet", {
+        input: {
+          snippetType: snippet.type,
+          title: snippet.title,
+          tool: snippet.tool,
+          environment: snippet.environment,
+          category: snippet.category,
+          description: snippet.description,
+          template: snippet.template,
+          tags: snippet.tags,
+          createdAt,
+        },
+      });
 
-    setDraftSnippet(null);
+      const newSnippet: Snippet = {
+        ...snippet,
+        id,
+        createdAt,
+      };
+
+      setSnippetList((current) => [
+        newSnippet,
+        ...current,
+      ]);
+
+      setDraftSnippet(null);
+    } catch (error) {
+      console.error("Failed to save snippet:", error);
+    }
   };
-
-  const [draftSnippet, setDraftSnippet] =
-    useState<DraftSnippet | null>(null);
 
   if (draftSnippet) {
     return (
@@ -109,7 +172,10 @@ function App() {
 
       <main className="main">
         <header className="topbar">
-          <SearchBar value={search} onChange={setSearch} />
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+          />
 
           <button
             className="add-button"
@@ -143,7 +209,9 @@ function App() {
 
             <select
               value={sortBy}
-              onChange={(event) => setSortBy(event.target.value)}
+              onChange={(event) =>
+                setSortBy(event.target.value)
+              }
             >
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
