@@ -4,7 +4,10 @@ import "./App.css";
 import Sidebar from "./components/Sidebar";
 import SearchBar from "./components/SearchBar";
 import SnippetCard from "./components/SnippetCard";
-import { snippets } from "./data/mockSnippets";
+import {
+  snippets as initialSnippets,
+  type Snippet,
+} from "./data/mockSnippets";
 import AddSnippetModal from "./components/AddSnippetModal";
 import ReviewSnippet from "./components/ReviewSnippet";
 
@@ -14,28 +17,51 @@ type DraftSnippet = {
 };
 
 function App() {
+  const [sortBy, setSortBy] = useState("newest");
+  const [snippetList, setSnippetList] =
+    useState<Snippet[]>(initialSnippets);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [search, setSearch] = useState("");
 
   const filteredSnippets = useMemo(() => {
     const keyword = search.toLowerCase().trim();
 
-    if (!keyword) {
-      return snippets;
-    }
+    let result = snippetList.filter((snippet) => {
+      if (!keyword) {
+        return true;
+      }
 
-    return snippets.filter((snippet) => {
       return (
         snippet.title.toLowerCase().includes(keyword) ||
         snippet.tool.toLowerCase().includes(keyword) ||
         snippet.category.toLowerCase().includes(keyword) ||
         snippet.template.toLowerCase().includes(keyword) ||
         snippet.tags.some((tag) =>
-          tag.toLowerCase().includes(keyword),
+          tag.toLowerCase().includes(keyword)
         )
       );
     });
-  }, [search]);
+
+    result = [...result].sort((a, b) => {
+      if (sortBy === "oldest") {
+        return (
+          new Date(a.createdAt).getTime() -
+          new Date(b.createdAt).getTime()
+        );
+      }
+
+      if (sortBy === "name") {
+        return a.title.localeCompare(b.title);
+      }
+
+      return (
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
+      );
+    });
+
+    return result;
+  }, [search, snippetList, sortBy]);
 
   const handleAnalyze = (type: string, content: string) => {
     setDraftSnippet({
@@ -46,8 +72,20 @@ function App() {
     setIsAddOpen(false);
   };
 
-  const handleSaveSnippet = () => {
-    console.log("Save snippet");
+  const handleSaveSnippet = (
+    snippet: Omit<Snippet, "id" | "createdAt">
+  ) => {
+    const newSnippet: Snippet = {
+      ...snippet,
+      id: Date.now(),
+      createdAt: new Date().toISOString(),
+    };
+
+    setSnippetList((current) => [
+      newSnippet,
+      ...current,
+    ]);
+
     setDraftSnippet(null);
   };
 
@@ -103,7 +141,10 @@ function App() {
               <option>Data Validation</option>
             </select>
 
-            <select defaultValue="newest">
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+            >
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
               <option value="name">Name</option>

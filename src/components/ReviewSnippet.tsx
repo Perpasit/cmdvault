@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { Snippet } from "../data/mockSnippets";
 
 type SuggestedVariable = {
     id: number;
@@ -11,7 +12,7 @@ type ReviewSnippetProps = {
     type: string;
     content: string;
     onBack: () => void;
-    onSave: () => void;
+    onSave: (snippet: Omit<Snippet, "id" | "createdAt">) => void;
 };
 
 export default function ReviewSnippet({
@@ -107,6 +108,24 @@ export default function ReviewSnippet({
                     : variable
             )
         );
+    };
+
+    const handleSave = () => {
+        const parsedTags = tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean);
+
+        onSave({
+            type: isSQL ? "sql" : "cli",
+            title: title.trim(),
+            tool,
+            environment,
+            category: category.trim(),
+            description: description.trim(),
+            template,
+            tags: parsedTags,
+        });
     };
 
     return (
@@ -290,7 +309,8 @@ export default function ReviewSnippet({
 
                     <button
                         className="primary-button"
-                        onClick={onSave}
+                        onClick={handleSave}
+                        disabled={!title.trim() || !template.trim()}
                     >
                         Save Snippet
                     </button>
