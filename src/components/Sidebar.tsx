@@ -14,7 +14,11 @@ type SidebarProps = {
     selectedCollectionId:
     number | null;
 
+    isSettingsActive: boolean;
+
     onSelectLibrary: () => void;
+
+    onSelectSettings: () => void;
 
     onSelectCollection: (
         collection: Collection
@@ -34,7 +38,9 @@ type SidebarProps = {
 export default function Sidebar({
     collections,
     selectedCollectionId,
+    isSettingsActive,
     onSelectLibrary,
+    onSelectSettings,
     onSelectCollection,
     onCreateCollection,
     onRenameCollection,
@@ -66,14 +72,11 @@ export default function Sidebar({
 
             <nav className="sidebar-nav">
                 <button
-                    className={`nav-item ${selectedCollectionId ===
-                            null
-                            ? "active"
-                            : ""
+                    className={`nav-item ${selectedCollectionId === null &&
+                        !isSettingsActive
+                        ? "active"
+                        : ""
                         }`}
-                    onClick={
-                        onSelectLibrary
-                    }
                 >
                     Library
                 </button>
@@ -107,7 +110,8 @@ export default function Sidebar({
                         >
                             <button
                                 className={`nav-item collection-nav-button ${selectedCollectionId ===
-                                        collection.id
+                                        collection.id &&
+                                        !isSettingsActive
                                         ? "active"
                                         : ""
                                     }`}
@@ -185,7 +189,13 @@ export default function Sidebar({
                 )}
             </div>
 
-            <button className="nav-item settings">
+            <button
+                className={`nav-item settings ${isSettingsActive
+                    ? "active"
+                    : ""
+                    }`}
+                onClick={onSelectSettings}
+            >
                 Settings
             </button>
         </aside>

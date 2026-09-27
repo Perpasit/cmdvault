@@ -1394,3 +1394,134 @@ textarea:disabled {
 .add-variable-button:hover {
   background: #f3f3f3;
 }
+
+.ai-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ai-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 8px;
+  background: #999999;
+}
+
+.ai-status-ready .ai-status-dot {
+  background: #22a447;
+}
+
+.ai-status-offline .ai-status-dot {
+  background: #d64545;
+}
+
+.ai-status-checking .ai-status-dot {
+  background: #999999;
+}
+
+/* =========================
+   Settings
+   ========================= */
+
+.settings-page {
+  width: 100%;
+  max-width: 760px;
+  padding: 36px 40px;
+}
+
+.settings-header {
+  margin-bottom: 36px;
+}
+
+.settings-header h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.settings-header p {
+  margin: 0;
+  color: #666666;
+  font-size: 14px;
+}
+
+.settings-section {
+  padding-top: 24px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.settings-section-header {
+  margin-bottom: 28px;
+}
+
+.settings-section-header h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.settings-section-header p {
+  margin: 0;
+  color: #777777;
+  font-size: 13px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 22px;
+}
+
+.settings-field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-field input {
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  border: 1px solid #d6d6d6;
+  border-radius: 6px;
+  background: #ffffff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.settings-field input:focus {
+  outline: none;
+  border-color: #888888;
+}
+
+.settings-field input:disabled {
+  background: #f5f5f5;
+  color: #666666;
+}
+
+.settings-help {
+  color: #888888;
+  font-size: 12px;
+}
+
+.settings-connection {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #eeeeee;
+}
+
+.settings-save-note {
+  margin: 20px 0 0;
+  color: #888888;
+  font-size: 12px;
+}

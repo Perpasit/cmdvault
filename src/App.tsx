@@ -19,6 +19,7 @@ import EditSnippet from "./components/EditSnippet";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import CreateCollectionModal from "./components/CreateCollectionModal";
 import RenameCollectionModal from "./components/RenameCollectionModal";
+import Settings from "./components/Settings";
 
 import type { Snippet } from "./data/mockSnippets";
 import { invoke } from "@tauri-apps/api/core";
@@ -55,6 +56,11 @@ type DatabaseSnippet = {
   tags: string[];
   createdAt: string;
 };
+
+type AiStatus =
+  | "checking"
+  | "ready"
+  | "offline";
 
 const DEFAULT_TOOL_OPTIONS = [
   "Kubernetes",
@@ -233,6 +239,54 @@ function App() {
     isDeleteConfirmOpen,
     setIsDeleteConfirmOpen,
   ] = useState(false);
+
+  const [aiStatus, setAiStatus] =
+    useState<AiStatus>("checking");
+
+  const [aiServerUrl, setAiServerUrl] =
+    useState(() =>
+      localStorage.getItem(
+        "cmdvault.ai.serverUrl"
+      ) ??
+      "http://127.0.0.1:11434"
+    );
+
+  const [aiModel, setAiModel] =
+    useState(() =>
+      localStorage.getItem(
+        "cmdvault.ai.model"
+      ) ??
+      "llama3.1:latest"
+    );
+
+  useEffect(() => {
+    localStorage.setItem(
+      "cmdvault.ai.serverUrl",
+      aiServerUrl
+    );
+  }, [aiServerUrl]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "cmdvault.ai.model",
+      aiModel
+    );
+  }, [aiModel]);
+
+  const [
+    isSettingsActive,
+    setIsSettingsActive,
+  ] = useState(false);
+
+  const handleSelectSettings = () => {
+    setIsSettingsActive(true);
+
+    setSelectedCollection(null);
+    setCollectionSnippetIds(null);
+    setSelectedSnippet(null);
+    setDraftSnippet(null);
+    setIsEditing(false);
+  };
 
   /*
    * Load snippets from SQLite
@@ -550,6 +604,7 @@ function App() {
     async (
       collection: Collection
     ) => {
+      setIsSettingsActive(false);
       try {
         const snippetIds =
           await invoke<number[]>(
@@ -582,6 +637,7 @@ function App() {
    * Back to Library
    */
   const handleSelectLibrary = () => {
+    setIsSettingsActive(false);
     setSelectedCollection(null);
 
     setCollectionSnippetIds(null);
@@ -870,30 +926,37 @@ function App() {
 
 
   /*
-* Test Local AI Connection
-*/
-  const handleTestAiConnection =
-    async () => {
-      try {
-        const response =
-          await invoke<string>(
-            "test_ai_connection"
-          );
+ * Local AI Health
+ */
+  const checkAiHealth =
+    useCallback(async () => {
+      setAiStatus("checking");
 
-        alert(
-          `Local AI connected:\n${response}`
+      try {
+        await invoke(
+          "check_ai_health",
+          {
+            serverUrl: aiServerUrl,
+            model: aiModel,
+          }
         );
+        setAiStatus("ready");
       } catch (error) {
-        console.error(
-          "Failed to connect to Local AI:",
+        console.warn(
+          "Local AI unavailable:",
           error
         );
 
-        alert(
-          `Local AI connection failed:\n${error}`
-        );
+        setAiStatus("offline");
       }
-    };
+    }, [
+      aiServerUrl,
+      aiModel,
+    ]);
+
+  useEffect(() => {
+    checkAiHealth();
+  }, [checkAiHealth]);
   /*
    * Add -> Analyze
    */
@@ -904,8 +967,14 @@ function App() {
           "analyze_snippet",
           {
             content,
+            serverUrl:
+              aiServerUrl,
+            model:
+              aiModel,
           }
         );
+
+      setAiStatus("ready");
 
       console.log(
         "AI analysis:",
@@ -1318,6 +1387,70 @@ function App() {
         );
       }
     };
+
+  /*
+* Settings
+*/
+  if (isSettingsActive) {
+    return (
+      <div className="app">
+        <Sidebar
+          collections={
+            collectionList
+          }
+          selectedCollectionId={
+            null
+          }
+          isSettingsActive={
+            true
+          }
+          onSelectLibrary={
+            handleSelectLibrary
+          }
+          onSelectSettings={
+            handleSelectSettings
+          }
+          onSelectCollection={
+            handleSelectCollection
+          }
+          onCreateCollection={() =>
+            setIsCreateCollectionOpen(
+              true
+            )
+          }
+          onRenameCollection={
+            setCollectionToRename
+          }
+          onDeleteCollection={
+            setCollectionToDelete
+          }
+        />
+
+        <main className="main">
+          <Settings
+            serverUrl={
+              aiServerUrl
+            }
+            model={
+              aiModel
+            }
+            aiStatus={
+              aiStatus
+            }
+            onServerUrlChange={
+              setAiServerUrl
+            }
+            onModelChange={
+              setAiModel
+            }
+            onTestConnection={
+              checkAiHealth
+            }
+          />
+        </main>
+      </div>
+    );
+  }
   /*
    * Edit
    */
@@ -1459,8 +1592,14 @@ function App() {
           selectedCollection?.id ??
           null
         }
+        isSettingsActive={
+          isSettingsActive
+        }
         onSelectLibrary={
           handleSelectLibrary
+        }
+        onSelectSettings={
+          handleSelectSettings
         }
         onSelectCollection={
           handleSelectCollection
@@ -1487,14 +1626,26 @@ function App() {
             }
           />
 
-          <button
-            className="secondary-button"
-            onClick={
-              handleTestAiConnection
+          <div
+            className={`ai-status ai-status-${aiStatus}`}
+            title={
+              aiStatus === "ready"
+                ? "Local AI is ready"
+                : aiStatus === "offline"
+                  ? "Local AI is unavailable"
+                  : "Checking Local AI"
             }
           >
-            Test AI
-          </button>
+            <span className="ai-status-dot" />
+
+            <span>
+              {aiStatus === "ready"
+                ? "AI Ready"
+                : aiStatus === "offline"
+                  ? "AI Offline"
+                  : "Checking AI"}
+            </span>
+          </div>
 
           <button
             className="add-button"

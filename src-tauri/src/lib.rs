@@ -8,11 +8,11 @@ use tauri::Manager;
  * ============================================================
  */
 
-const OLLAMA_GENERATE_URL: &str =
-    "http://127.0.0.1:11434/api/generate";
+// const OLLAMA_GENERATE_URL: &str =
+//     "http://127.0.0.1:11434/api/generate";
 
-const OLLAMA_MODEL: &str =
-    "llama3.1:latest";
+// const OLLAMA_MODEL: &str =
+//     "llama3.1:latest";
 
 #[derive(serde::Serialize)]
 struct OllamaGenerateRequest {
@@ -242,74 +242,128 @@ fn get_database_path(
  * ============================================================
  */
 
+
 #[tauri::command]
-fn test_ai_connection() -> Result<String, String> {
-    let client =
-        reqwest::blocking::Client::new();
+fn check_ai_health(
+    server_url: String,
+    model: String,
+) -> Result<(), String> {
+    let server_url =
+        server_url.trim().trim_end_matches('/');
 
-    let request =
-        OllamaGenerateRequest {
-            model:
-                OLLAMA_MODEL.to_string(),
-            prompt:
-                "Reply with exactly: CmdVault AI connected"
-                    .to_string(),
-            stream: false,
-        };
+    let model = model.trim();
 
-    let response = client
-        .post(OLLAMA_GENERATE_URL)
-        .json(&request)
-        .send()
-        .map_err(|error| {
-            format!(
-                "Failed to connect to local AI: {}",
-                error
-            )
-        })?;
-
-    if !response.status().is_success() {
+    if server_url.is_empty() {
         return Err(
-            format!(
-                "Local AI returned HTTP {}",
-                response.status()
-            )
+            "Server URL is required."
+                .to_string()
         );
     }
 
-    let result =
-        response
-            .json::<OllamaGenerateResponse>()
+    if model.is_empty() {
+        return Err(
+            "Model is required."
+                .to_string()
+        );
+    }
+
+    let client =
+        reqwest::blocking::Client::builder()
+            .timeout(
+                std::time::Duration::from_secs(3)
+            )
+            .build()
             .map_err(|error| {
                 format!(
-                    "Failed to read local AI response: {}",
+                    "Failed to create HTTP client: {}",
                     error
                 )
             })?;
 
-    if !result.done {
+    let url =
+        format!("{}/api/tags", server_url);
+
+    let response = client
+        .get(url)
+        .send()
+        .map_err(|_| {
+            "Local AI is unavailable."
+                .to_string()
+        })?;
+
+    if !response.status().is_success() {
         return Err(
-            "Local AI response did not complete."
-                .to_string(),
+            "Local AI is unavailable."
+                .to_string()
         );
     }
 
-    Ok(result.response.trim().to_string())
+    let body: serde_json::Value =
+        response
+            .json()
+            .map_err(|_| {
+                "Failed to read Ollama models."
+                    .to_string()
+            })?;
+
+    let model_exists = body["models"]
+        .as_array()
+        .map(|models| {
+            models.iter().any(|item| {
+                item["name"]
+                    .as_str()
+                    .map(|name| name == model)
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+
+    if !model_exists {
+        return Err(
+            format!(
+                "Model '{}' is not installed.",
+                model
+            )
+        );
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
 fn analyze_snippet(
     content: String,
+    server_url: String,
+    model: String,
 ) -> Result<AnalyzeResult, String> {
     let trimmed_content =
         content.trim();
 
-    if trimmed_content.is_empty() {
+    let server_url =
+    server_url.trim().trim_end_matches('/');
+
+    let model =
+    model.trim();
+
+    if server_url.is_empty() {
         return Err(
-            "Snippet content cannot be empty."
-                .to_string(),
+            "Server URL is required."
+                .to_string()
         );
     }
+
+    if model.is_empty() {
+        return Err(
+            "Model is required."
+                .to_string()
+        );
+    }
+
+    let generate_url =
+        format!(
+            "{}/api/generate",
+            server_url
+        );
 
     /*
      * Build prompt
@@ -325,7 +379,7 @@ fn analyze_snippet(
     let request =
         OllamaGenerateRequest {
             model:
-                OLLAMA_MODEL.to_string(),
+                model.to_string(),
             prompt,
             stream: false,
         };
@@ -347,7 +401,7 @@ fn analyze_snippet(
         })?;
 
     let response = client
-        .post(OLLAMA_GENERATE_URL)
+        .post(&generate_url)
         .json(&request)
         .send()
         .map_err(|error| {
@@ -713,6 +767,7 @@ pub fn run() {
                 get_snippets,
                 update_snippet,
                 delete_snippet,
+                check_ai_health,
 
                 /*
                  * Collections
@@ -733,7 +788,6 @@ pub fn run() {
                 /*
                 * Local AI
                 */
-                test_ai_connection,
                 analyze_snippet
             ],
         )
