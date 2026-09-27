@@ -1,3 +1,7 @@
+import {
+    useState,
+} from "react";
+
 export type Collection = {
     id: number;
     name: string;
@@ -17,6 +21,14 @@ type SidebarProps = {
     ) => void;
 
     onCreateCollection: () => void;
+
+    onRenameCollection: (
+        collection: Collection
+    ) => void;
+
+    onDeleteCollection: (
+        collection: Collection
+    ) => void;
 };
 
 export default function Sidebar({
@@ -25,7 +37,27 @@ export default function Sidebar({
     onSelectLibrary,
     onSelectCollection,
     onCreateCollection,
+    onRenameCollection,
+    onDeleteCollection,
 }: SidebarProps) {
+    const [
+        openMenuId,
+        setOpenMenuId,
+    ] = useState<number | null>(
+        null
+    );
+
+    const toggleMenu = (
+        collectionId: number
+    ) => {
+        setOpenMenuId(
+            (current) =>
+                current === collectionId
+                    ? null
+                    : collectionId
+        );
+    };
+
     return (
         <aside className="sidebar">
             <div className="brand">
@@ -67,23 +99,88 @@ export default function Sidebar({
 
                 {collections.map(
                     (collection) => (
-                        <button
-                            className={`nav-item ${selectedCollectionId ===
-                                    collection.id
-                                    ? "active"
-                                    : ""
-                                }`}
+                        <div
+                            className="collection-nav-row"
                             key={
                                 collection.id
                             }
-                            onClick={() =>
-                                onSelectCollection(
-                                    collection
-                                )
-                            }
                         >
-                            {collection.name}
-                        </button>
+                            <button
+                                className={`nav-item collection-nav-button ${selectedCollectionId ===
+                                        collection.id
+                                        ? "active"
+                                        : ""
+                                    }`}
+                                onClick={() => {
+                                    setOpenMenuId(
+                                        null
+                                    );
+
+                                    onSelectCollection(
+                                        collection
+                                    );
+                                }}
+                            >
+                                <span className="collection-nav-name">
+                                    {
+                                        collection.name
+                                    }
+                                </span>
+                            </button>
+
+                            <div className="collection-menu-wrapper">
+                                <button
+                                    className="collection-menu-button"
+                                    onClick={(
+                                        event
+                                    ) => {
+                                        event.stopPropagation();
+
+                                        toggleMenu(
+                                            collection.id
+                                        );
+                                    }}
+                                    aria-label={`Actions for ${collection.name}`}
+                                    title="Collection actions"
+                                >
+                                    ···
+                                </button>
+
+                                {openMenuId ===
+                                    collection.id && (
+                                        <div className="collection-menu">
+                                            <button
+                                                onClick={() => {
+                                                    setOpenMenuId(
+                                                        null
+                                                    );
+
+                                                    onRenameCollection(
+                                                        collection
+                                                    );
+                                                }}
+                                            >
+                                                Rename
+                                            </button>
+
+                                            <button
+                                                className="danger"
+                                                onClick={() => {
+                                                    setOpenMenuId(
+                                                        null
+                                                    );
+
+                                                    onDeleteCollection(
+                                                        collection
+                                                    );
+                                                }}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    )}
+                            </div>
+                        </div>
                     )
                 )}
             </div>

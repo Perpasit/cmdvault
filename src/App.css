@@ -1181,3 +1181,126 @@
   font-size: 13px;
   color: #777777;
 }
+
+/* =========================
+   Collection Sidebar Menu
+   ========================= */
+
+.collection-nav-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.collection-nav-button {
+  flex: 1;
+  min-width: 0;
+  padding-right: 38px;
+}
+
+.collection-nav-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Three-dot menu position
+ */
+.collection-menu-wrapper {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+}
+
+.collection-menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 26px;
+  height: 26px;
+  padding: 0;
+
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+
+  color: #777777;
+  font-size: 15px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.collection-menu-button:hover {
+  background: #e9e9e9;
+  color: #222222;
+}
+
+/*
+ * Dropdown
+ *
+ * Opens below the three-dot button
+ * and expands toward the left,
+ * so it stays close to the sidebar.
+ */
+.collection-menu {
+  position: absolute;
+
+  /* เปิดทางขวา และให้แถวแรกตรงกับ Collection ที่กด */
+  left: calc(100% + 6px);
+  right: auto;
+  top: 0;
+
+  z-index: 1000;
+
+  width: 116px;
+  padding: 4px;
+
+  border: 1px solid #dddddd;
+  border-radius: 6px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.collection-menu button {
+  display: flex;
+  align-items: center;
+
+  width: 100%;
+  min-height: 32px;
+  padding: 7px 10px;
+
+  border: none;
+  border-radius: 4px;
+
+  background: transparent;
+
+  color: #333333;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+
+  cursor: pointer;
+}
+
+.collection-menu button:hover {
+  background: #f3f3f3;
+}
+
+.collection-menu button.danger {
+  color: #b42318;
+}
+
+.collection-menu button.danger:hover {
+  background: #fef3f2;
+}

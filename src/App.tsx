@@ -18,6 +18,7 @@ import SnippetDetail from "./components/SnippetDetail";
 import EditSnippet from "./components/EditSnippet";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import CreateCollectionModal from "./components/CreateCollectionModal";
+import RenameCollectionModal from "./components/RenameCollectionModal";
 
 import type { Snippet } from "./data/mockSnippets";
 import { invoke } from "@tauri-apps/api/core";
@@ -162,6 +163,20 @@ function App() {
     isCreateCollectionOpen,
     setIsCreateCollectionOpen,
   ] = useState(false);
+
+  const [
+    collectionToRename,
+    setCollectionToRename,
+  ] = useState<Collection | null>(
+    null
+  );
+
+  const [
+    collectionToDelete,
+    setCollectionToDelete,
+  ] = useState<Collection | null>(
+    null
+  );
 
   const [isAddOpen, setIsAddOpen] =
     useState(false);
@@ -335,7 +350,182 @@ function App() {
         );
       }
     };
+  /*
+* Rename Collection
+*/
+  const handleRenameCollection =
+    async (name: string) => {
+      if (!collectionToRename) {
+        return;
+      }
 
+      const trimmedName =
+        name.trim();
+
+      if (!trimmedName) {
+        return;
+      }
+
+      try {
+        await invoke(
+          "rename_collection",
+          {
+            input: {
+              id:
+                collectionToRename.id,
+              name:
+                trimmedName,
+            },
+          }
+        );
+
+        setCollectionList(
+          (current) =>
+            current
+              .map(
+                (
+                  collection
+                ) =>
+                  collection.id ===
+                    collectionToRename.id
+                    ? {
+                      ...collection,
+                      name:
+                        trimmedName,
+                    }
+                    : collection
+              )
+              .sort(
+                (a, b) =>
+                  a.name.localeCompare(
+                    b.name
+                  )
+              )
+        );
+
+        /*
+         * If user is currently
+         * viewing this Collection,
+         * update page title too.
+         */
+        setSelectedCollection(
+          (current) =>
+            current?.id ===
+              collectionToRename.id
+              ? {
+                ...current,
+                name:
+                  trimmedName,
+              }
+              : current
+        );
+
+        /*
+         * Keep Detail/Edit
+         * Collection names updated.
+         */
+        setSelectedSnippetCollections(
+          (current) =>
+            current.map(
+              (
+                collection
+              ) =>
+                collection.id ===
+                  collectionToRename.id
+                  ? {
+                    ...collection,
+                    name:
+                      trimmedName,
+                  }
+                  : collection
+            )
+        );
+
+        setCollectionToRename(
+          null
+        );
+      } catch (error) {
+        console.error(
+          "Failed to rename collection:",
+          error
+        );
+      }
+    };
+
+  /*
+* Delete Collection
+*/
+  const handleDeleteCollection =
+    async () => {
+      if (!collectionToDelete) {
+        return;
+      }
+
+      const collectionId =
+        collectionToDelete.id;
+
+      try {
+        await invoke(
+          "delete_collection",
+          {
+            id:
+              collectionId,
+          }
+        );
+
+        /*
+         * Remove from Sidebar
+         */
+        setCollectionList(
+          (current) =>
+            current.filter(
+              (collection) =>
+                collection.id !==
+                collectionId
+            )
+        );
+
+        /*
+         * Remove from currently
+         * opened snippet collections
+         */
+        setSelectedSnippetCollections(
+          (current) =>
+            current.filter(
+              (collection) =>
+                collection.id !==
+                collectionId
+            )
+        );
+
+        /*
+         * If we're currently viewing
+         * the deleted Collection,
+         * return to Library.
+         */
+        if (
+          selectedCollection?.id ===
+          collectionId
+        ) {
+          setSelectedCollection(
+            null
+          );
+
+          setCollectionSnippetIds(
+            null
+          );
+        }
+
+        setCollectionToDelete(
+          null
+        );
+      } catch (error) {
+        console.error(
+          "Failed to delete collection:",
+          error
+        );
+      }
+    };
   /*
    * Select Collection
    */
@@ -1121,7 +1311,8 @@ function App() {
 
         {isDeleteConfirmOpen && (
           <DeleteConfirmModal
-            snippetTitle={
+            itemType="snippet"
+            itemName={
               selectedSnippet.title
             }
             onCancel={() =>
@@ -1194,6 +1385,12 @@ function App() {
           setIsCreateCollectionOpen(
             true
           )
+        }
+        onRenameCollection={
+          setCollectionToRename
+        }
+        onDeleteCollection={
+          setCollectionToDelete
         }
       />
 
@@ -1392,6 +1589,49 @@ function App() {
           }
           onCreate={
             handleCreateCollection
+          }
+        />
+      )}
+      {collectionToRename && (
+        <RenameCollectionModal
+          currentName={
+            collectionToRename.name
+          }
+          existingNames={
+            collectionList
+              .filter(
+                (collection) =>
+                  collection.id !==
+                  collectionToRename.id
+              )
+              .map(
+                (collection) =>
+                  collection.name
+              )
+          }
+          onClose={() =>
+            setCollectionToRename(
+              null
+            )
+          }
+          onRename={
+            handleRenameCollection
+          }
+        />
+      )}
+      {collectionToDelete && (
+        <DeleteConfirmModal
+          itemType="collection"
+          itemName={
+            collectionToDelete.name
+          }
+          onCancel={() =>
+            setCollectionToDelete(
+              null
+            )
+          }
+          onConfirm={
+            handleDeleteCollection
           }
         />
       )}
