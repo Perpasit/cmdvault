@@ -7,7 +7,9 @@ import {
 
 import "./App.css";
 
-import Sidebar from "./components/Sidebar";
+import Sidebar, {
+  type Collection,
+} from "./components/Sidebar";
 import SearchBar from "./components/SearchBar";
 import SnippetCard from "./components/SnippetCard";
 import AddSnippetModal from "./components/AddSnippetModal";
@@ -15,6 +17,7 @@ import ReviewSnippet from "./components/ReviewSnippet";
 import SnippetDetail from "./components/SnippetDetail";
 import EditSnippet from "./components/EditSnippet";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
+import CreateCollectionModal from "./components/CreateCollectionModal";
 
 import type { Snippet } from "./data/mockSnippets";
 import { invoke } from "@tauri-apps/api/core";
@@ -136,6 +139,30 @@ function App() {
   const [snippetList, setSnippetList] =
     useState<Snippet[]>([]);
 
+  const [
+    collectionList,
+    setCollectionList,
+  ] = useState<Collection[]>([]);
+
+  const [
+    selectedCollection,
+    setSelectedCollection,
+  ] = useState<Collection | null>(
+    null
+  );
+
+  const [
+    collectionSnippetIds,
+    setCollectionSnippetIds,
+  ] = useState<number[] | null>(
+    null
+  );
+
+  const [
+    isCreateCollectionOpen,
+    setIsCreateCollectionOpen,
+  ] = useState(false);
+
   const [isAddOpen, setIsAddOpen] =
     useState(false);
 
@@ -181,12 +208,15 @@ function App() {
             DatabaseSnippet[]
           >("get_snippets");
 
-        const loadedSnippets: Snippet[] =
+        const loadedSnippets:
+          Snippet[] =
           databaseSnippets.map(
             (snippet) => ({
               id: snippet.id,
-              title: snippet.title,
-              tool: snippet.tool,
+              title:
+                snippet.title,
+              tool:
+                snippet.tool,
               environment:
                 snippet.environment,
               category:
@@ -195,7 +225,8 @@ function App() {
                 snippet.description,
               template:
                 snippet.template,
-              tags: snippet.tags,
+              tags:
+                snippet.tags,
               createdAt:
                 snippet.createdAt,
             })
@@ -214,6 +245,139 @@ function App() {
 
     loadSnippets();
   }, []);
+
+  /*
+   * Load Collections from SQLite
+   */
+  useEffect(() => {
+    const loadCollections =
+      async () => {
+        try {
+          const databaseCollections =
+            await invoke<
+              Collection[]
+            >(
+              "get_collections"
+            );
+
+          setCollectionList(
+            databaseCollections
+          );
+        } catch (error) {
+          console.error(
+            "Failed to load collections:",
+            error
+          );
+        }
+      };
+
+    loadCollections();
+  }, []);
+
+  /*
+   * Create Collection
+  */
+  const handleCreateCollection =
+    async (name: string) => {
+      const trimmedName =
+        name.trim();
+
+      if (!trimmedName) {
+        return;
+      }
+
+      const createdAt =
+        new Date().toISOString();
+
+      try {
+        const id =
+          await invoke<number>(
+            "create_collection",
+            {
+              input: {
+                name: trimmedName,
+                createdAt,
+              },
+            }
+          );
+
+        const newCollection:
+          Collection = {
+          id,
+          name: trimmedName,
+          createdAt,
+        };
+
+        setCollectionList(
+          (current) =>
+            [
+              ...current,
+              newCollection,
+            ].sort((a, b) =>
+              a.name.localeCompare(
+                b.name
+              )
+            )
+        );
+
+        setIsCreateCollectionOpen(
+          false
+        );
+      } catch (error) {
+        console.error(
+          "Failed to create collection:",
+          error
+        );
+      }
+    };
+
+  /*
+   * Select Collection
+   */
+  const handleSelectCollection =
+    async (
+      collection: Collection
+    ) => {
+      try {
+        const snippetIds =
+          await invoke<number[]>(
+            "get_collection_snippet_ids",
+            {
+              collectionId:
+                collection.id,
+            }
+          );
+
+        setSelectedCollection(
+          collection
+        );
+
+        setCollectionSnippetIds(
+          snippetIds
+        );
+
+        setToolFilter("");
+        setCategoryFilter("");
+      } catch (error) {
+        console.error(
+          "Failed to load collection snippets:",
+          error
+        );
+      }
+    };
+
+  /*
+   * Back to Library
+   */
+  const handleSelectLibrary = () => {
+    setSelectedCollection(null);
+
+    setCollectionSnippetIds(null);
+
+    setToolFilter("");
+    setCategoryFilter("");
+  };
+
 
   /*
    * Library Tool filter
@@ -309,28 +473,15 @@ function App() {
 
   /*
    * Dynamic Category options
-   *
-   * No Tool selected:
-   *   Default categories from all Tools
-   *   +
-   *   all previously saved categories
-   *
-   * Tool selected:
-   *   Default categories for that Tool
-   *   +
-   *   categories previously saved
-   *   with that Tool
    */
   const getCategoryOptions =
     useCallback(
-      (tool: string): string[] => {
+      (
+        tool: string
+      ): string[] => {
         const trimmedTool =
           tool.trim();
 
-        /*
-         * All categories that have
-         * previously been saved.
-         */
         const allSavedCategories =
           snippetList
             .map((snippet) =>
@@ -338,20 +489,13 @@ function App() {
             )
             .filter(Boolean);
 
-        /*
-         * All built-in categories.
-         */
         const allDefaultCategories =
           Object.values(
             DEFAULT_CATEGORY_OPTIONS
           ).flat();
 
         /*
-         * Tool has not been selected.
-         *
-         * Behave like Tool and
-         * Environment dropdown:
-         * show available suggestions.
+         * No Tool selected
          */
         if (!trimmedTool) {
           return Array.from(
@@ -363,8 +507,8 @@ function App() {
         }
 
         /*
-         * Built-in categories
-         * belonging to this Tool.
+         * Built-in Categories
+         * for selected Tool
          */
         const defaultCategories =
           DEFAULT_CATEGORY_OPTIONS[
@@ -372,8 +516,8 @@ function App() {
           ] ?? [];
 
         /*
-         * Categories previously
-         * saved with this Tool.
+         * Saved Categories
+         * for selected Tool
          */
         const savedCategoriesForTool =
           snippetList
@@ -452,10 +596,18 @@ function App() {
               snippet.category ===
               categoryFilter;
 
+            const matchesCollection =
+              collectionSnippetIds ===
+              null ||
+              collectionSnippetIds.includes(
+                snippet.id
+              );
+
             return (
               matchesSearch &&
               matchesTool &&
-              matchesCategory
+              matchesCategory &&
+              matchesCollection
             );
           }
         );
@@ -476,7 +628,9 @@ function App() {
           );
         }
 
-        if (sortBy === "name") {
+        if (
+          sortBy === "name"
+        ) {
           return a.title.localeCompare(
             b.title
           );
@@ -499,6 +653,7 @@ function App() {
       sortBy,
       toolFilter,
       categoryFilter,
+      collectionSnippetIds,
     ]);
 
   /*
@@ -515,14 +670,15 @@ function App() {
   };
 
   /*
-   * Create
+   * Create Snippet
    */
   const handleSaveSnippet =
     async (
       snippet: Omit<
         Snippet,
         "id" | "createdAt"
-      >
+      >,
+      collectionIds: number[]
     ) => {
       const createdAt =
         new Date().toISOString();
@@ -535,44 +691,45 @@ function App() {
               input: {
                 title:
                   snippet.title,
-
                 tool:
                   snippet.tool,
-
                 environment:
                   snippet.environment,
-
                 category:
                   snippet.category,
-
                 description:
                   snippet.description,
-
                 template:
                   snippet.template,
-
                 tags:
                   snippet.tags,
-
                 createdAt,
               },
             }
           );
 
-        const newSnippet: Snippet =
-        {
+        for (
+          const collectionId
+          of collectionIds
+        ) {
+          await invoke(
+            "add_snippet_to_collection",
+            {
+              input: {
+                snippetId: id,
+                collectionId,
+              },
+            }
+          );
+        }
+
+        const newSnippet:
+          Snippet = {
           ...snippet,
           id,
           createdAt,
         };
 
-        /*
-         * Because dynamic metadata
-         * is derived from snippetList,
-         * newly created Tool /
-         * Environment / Category
-         * becomes available immediately.
-         */
         setSnippetList(
           (current) => [
             newSnippet,
@@ -590,7 +747,7 @@ function App() {
     };
 
   /*
-   * Update
+   * Update Snippet
    */
   const handleUpdateSnippet =
     async (
@@ -603,25 +760,18 @@ function App() {
             input: {
               id:
                 updatedSnippet.id,
-
               title:
                 updatedSnippet.title,
-
               tool:
                 updatedSnippet.tool,
-
               environment:
                 updatedSnippet.environment,
-
               category:
                 updatedSnippet.category,
-
               description:
                 updatedSnippet.description,
-
               template:
                 updatedSnippet.template,
-
               tags:
                 updatedSnippet.tags,
             },
@@ -653,7 +803,7 @@ function App() {
     };
 
   /*
-   * Delete
+   * Delete Snippet
    */
   const handleDeleteSnippet =
     async (
@@ -681,7 +831,6 @@ function App() {
         );
 
         setSelectedSnippet(null);
-
         setIsEditing(false);
       } catch (error) {
         console.error(
@@ -792,6 +941,9 @@ function App() {
         getCategoryOptions={
           getCategoryOptions
         }
+        collections={
+          collectionList
+        }
       />
     );
   }
@@ -801,7 +953,26 @@ function App() {
    */
   return (
     <div className="app">
-      <Sidebar />
+      <Sidebar
+        collections={
+          collectionList
+        }
+        selectedCollectionId={
+          selectedCollection?.id ??
+          null
+        }
+        onSelectLibrary={
+          handleSelectLibrary
+        }
+        onSelectCollection={
+          handleSelectCollection
+        }
+        onCreateCollection={() =>
+          setIsCreateCollectionOpen(
+            true
+          )
+        }
+      />
 
       <main className="main">
         <header className="topbar">
@@ -827,7 +998,9 @@ function App() {
         <section className="library-header">
           <div>
             <h1>
-              Library
+              {selectedCollection
+                ? selectedCollection.name
+                : "Library"}
             </h1>
 
             <p>
@@ -847,7 +1020,8 @@ function App() {
                 event
               ) => {
                 setToolFilter(
-                  event.target
+                  event
+                    .target
                     .value
                 );
 
@@ -884,7 +1058,8 @@ function App() {
                 event
               ) =>
                 setCategoryFilter(
-                  event.target
+                  event
+                    .target
                     .value
                 )
               }
@@ -919,7 +1094,8 @@ function App() {
                 event
               ) =>
                 setSortBy(
-                  event.target
+                  event
+                    .target
                     .value
                 )
               }
@@ -974,6 +1150,25 @@ function App() {
           }
           onAnalyze={
             handleAnalyze
+          }
+        />
+      )}
+
+      {isCreateCollectionOpen && (
+        <CreateCollectionModal
+          existingNames={
+            collectionList.map(
+              (collection) =>
+                collection.name
+            )
+          }
+          onClose={() =>
+            setIsCreateCollectionOpen(
+              false
+            )
+          }
+          onCreate={
+            handleCreateCollection
           }
         />
       )}

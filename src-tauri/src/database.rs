@@ -15,13 +15,27 @@ pub struct Snippet {
     pub created_at: String,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Collection {
+    pub id: i64,
+    pub name: String,
+    pub created_at: String,
+}
+
 pub fn initialize_database(
     database_path: &Path,
 ) -> Result<()> {
     let connection = Connection::open(database_path)?;
 
-    connection.execute(
+    /*
+     * Foreign keys are disabled by default
+     * in SQLite connections.
+     */
+    connection.execute_batch(
         "
+        PRAGMA foreign_keys = ON;
+
         CREATE TABLE IF NOT EXISTS snippets (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             title        TEXT NOT NULL,
@@ -32,13 +46,48 @@ pub fn initialize_database(
             template     TEXT NOT NULL,
             tags         TEXT NOT NULL,
             created_at   TEXT NOT NULL
-        )
+        );
+
+        CREATE TABLE IF NOT EXISTS collections (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            name         TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            created_at   TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS snippet_collections (
+            snippet_id      INTEGER NOT NULL,
+            collection_id   INTEGER NOT NULL,
+
+            PRIMARY KEY (
+                snippet_id,
+                collection_id
+            ),
+
+            FOREIGN KEY (snippet_id)
+                REFERENCES snippets(id)
+                ON DELETE CASCADE,
+
+            FOREIGN KEY (collection_id)
+                REFERENCES collections(id)
+                ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_snippet_collections_snippet
+        ON snippet_collections(snippet_id);
+
+        CREATE INDEX IF NOT EXISTS idx_snippet_collections_collection
+        ON snippet_collections(collection_id);
         ",
-        [],
     )?;
 
     Ok(())
 }
+
+/*
+ * ============================================================
+ * Snippets
+ * ============================================================
+ */
 
 pub fn create_snippet(
     database_path: &Path,
@@ -115,6 +164,7 @@ pub fn get_snippets(
             category: row.get(4)?,
             description: row.get(5)?,
             template: row.get(6)?,
+
             tags: if tags.is_empty() {
                 Vec::new()
             } else {
@@ -122,6 +172,7 @@ pub fn get_snippets(
                     .map(|tag| tag.trim().to_string())
                     .collect()
             },
+
             created_at: row.get(8)?,
         })
     })?;
@@ -180,12 +231,328 @@ pub fn delete_snippet(
     database_path: &Path,
     id: i64,
 ) -> Result<()> {
-    let connection = Connection::open(database_path)?;
+    let mut connection =
+        Connection::open(database_path)?;
 
     connection.execute(
-        "DELETE FROM snippets WHERE id = ?1",
+        "PRAGMA foreign_keys = ON",
+        [],
+    )?;
+
+    let transaction =
+        connection.transaction()?;
+
+    /*
+     * Explicit delete keeps this safe even if
+     * the database was previously created
+     * without foreign key enforcement.
+     */
+    transaction.execute(
+        "
+        DELETE FROM snippet_collections
+        WHERE snippet_id = ?1
+        ",
         [id],
     )?;
 
+    transaction.execute(
+        "
+        DELETE FROM snippets
+        WHERE id = ?1
+        ",
+        [id],
+    )?;
+
+    transaction.commit()?;
+
     Ok(())
+}
+
+/*
+ * ============================================================
+ * Collections
+ * ============================================================
+ */
+
+/*
+ * Create Collection
+ */
+pub fn create_collection(
+    database_path: &Path,
+    name: &str,
+    created_at: &str,
+) -> Result<i64> {
+    let connection = Connection::open(database_path)?;
+
+    connection.execute(
+        "
+        INSERT INTO collections (
+            name,
+            created_at
+        )
+        VALUES (?1, ?2)
+        ",
+        (
+            name,
+            created_at,
+        ),
+    )?;
+
+    Ok(connection.last_insert_rowid())
+}
+
+/*
+ * Get all Collections
+ */
+pub fn get_collections(
+    database_path: &Path,
+) -> Result<Vec<Collection>> {
+    let connection = Connection::open(database_path)?;
+
+    let mut statement = connection.prepare(
+        "
+        SELECT
+            id,
+            name,
+            created_at
+        FROM collections
+        ORDER BY name COLLATE NOCASE ASC
+        ",
+    )?;
+
+    let rows = statement.query_map(
+        [],
+        |row| {
+            Ok(Collection {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                created_at: row.get(2)?,
+            })
+        },
+    )?;
+
+    let mut collections = Vec::new();
+
+    for row in rows {
+        collections.push(row?);
+    }
+
+    Ok(collections)
+}
+
+/*
+ * Rename Collection
+ */
+pub fn rename_collection(
+    database_path: &Path,
+    id: i64,
+    name: &str,
+) -> Result<()> {
+    let connection = Connection::open(database_path)?;
+
+    connection.execute(
+        "
+        UPDATE collections
+        SET name = ?1
+        WHERE id = ?2
+        ",
+        (
+            name,
+            id,
+        ),
+    )?;
+
+    Ok(())
+}
+
+/*
+ * Delete Collection
+ */
+pub fn delete_collection(
+    database_path: &Path,
+    id: i64,
+) -> Result<()> {
+    let mut connection =
+        Connection::open(database_path)?;
+
+    connection.execute(
+        "PRAGMA foreign_keys = ON",
+        [],
+    )?;
+
+    let transaction =
+        connection.transaction()?;
+
+    /*
+     * Remove relationships first.
+     *
+     * Snippets themselves are NOT deleted.
+     */
+    transaction.execute(
+        "
+        DELETE FROM snippet_collections
+        WHERE collection_id = ?1
+        ",
+        [id],
+    )?;
+
+    transaction.execute(
+        "
+        DELETE FROM collections
+        WHERE id = ?1
+        ",
+        [id],
+    )?;
+
+    transaction.commit()?;
+
+    Ok(())
+}
+
+/*
+ * ============================================================
+ * Snippet <-> Collection relationships
+ * ============================================================
+ */
+
+/*
+ * Add a Snippet to a Collection
+ *
+ * INSERT OR IGNORE prevents duplicate relationships.
+ */
+pub fn add_snippet_to_collection(
+    database_path: &Path,
+    snippet_id: i64,
+    collection_id: i64,
+) -> Result<()> {
+    let connection = Connection::open(database_path)?;
+
+    connection.execute(
+        "PRAGMA foreign_keys = ON",
+        [],
+    )?;
+
+    connection.execute(
+        "
+        INSERT OR IGNORE INTO snippet_collections (
+            snippet_id,
+            collection_id
+        )
+        VALUES (?1, ?2)
+        ",
+        (
+            snippet_id,
+            collection_id,
+        ),
+    )?;
+
+    Ok(())
+}
+
+/*
+ * Remove a Snippet from a Collection
+ */
+pub fn remove_snippet_from_collection(
+    database_path: &Path,
+    snippet_id: i64,
+    collection_id: i64,
+) -> Result<()> {
+    let connection = Connection::open(database_path)?;
+
+    connection.execute(
+        "
+        DELETE FROM snippet_collections
+        WHERE
+            snippet_id = ?1
+            AND collection_id = ?2
+        ",
+        (
+            snippet_id,
+            collection_id,
+        ),
+    )?;
+
+    Ok(())
+}
+
+/*
+ * Get Collections belonging to one Snippet.
+ */
+pub fn get_snippet_collections(
+    database_path: &Path,
+    snippet_id: i64,
+) -> Result<Vec<Collection>> {
+    let connection = Connection::open(database_path)?;
+
+    let mut statement = connection.prepare(
+        "
+        SELECT
+            collections.id,
+            collections.name,
+            collections.created_at
+        FROM collections
+
+        INNER JOIN snippet_collections
+            ON snippet_collections.collection_id =
+               collections.id
+
+        WHERE snippet_collections.snippet_id = ?1
+
+        ORDER BY
+            collections.name COLLATE NOCASE ASC
+        ",
+    )?;
+
+    let rows = statement.query_map(
+        [snippet_id],
+        |row| {
+            Ok(Collection {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                created_at: row.get(2)?,
+            })
+        },
+    )?;
+
+    let mut collections = Vec::new();
+
+    for row in rows {
+        collections.push(row?);
+    }
+
+    Ok(collections)
+}
+
+/*
+ * Get Snippet IDs belonging to one Collection.
+ *
+ * We'll use this later for Library filtering.
+ */
+pub fn get_collection_snippet_ids(
+    database_path: &Path,
+    collection_id: i64,
+) -> Result<Vec<i64>> {
+    let connection = Connection::open(database_path)?;
+
+    let mut statement = connection.prepare(
+        "
+        SELECT snippet_id
+        FROM snippet_collections
+        WHERE collection_id = ?1
+        ORDER BY snippet_id ASC
+        ",
+    )?;
+
+    let rows = statement.query_map(
+        [collection_id],
+        |row| row.get(0),
+    )?;
+
+    let mut snippet_ids = Vec::new();
+
+    for row in rows {
+        snippet_ids.push(row?);
+    }
+
+    Ok(snippet_ids)
 }

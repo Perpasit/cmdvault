@@ -1092,3 +1092,92 @@
   color: #888;
   font-size: 13px;
 }
+
+.collection-modal {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.collection-modal .form-group input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-error {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #666;
+}
+
+/* =========================
+   Collection Selector
+   ========================= */
+
+.collection-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.collection-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  width: auto;
+  padding: 8px 12px;
+
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+
+  background: #ffffff;
+
+  font-size: 13px;
+  font-weight: 500;
+  color: #333333;
+
+  cursor: pointer;
+  user-select: none;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.collection-option:hover {
+  background: #f7f7f7;
+  border-color: #bdbdbd;
+}
+
+.collection-option input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+
+  margin: 0;
+  padding: 0;
+
+  cursor: pointer;
+  accent-color: #222222;
+}
+
+.collection-option:has(input[type="checkbox"]:checked) {
+  background: #f3f3f3;
+  border-color: #999999;
+}
+
+.collection-option:has(input[type="checkbox"]:checked) span {
+  color: #111111;
+}
+
+.form-hint {
+  display: block;
+  margin-top: 6px;
+
+  font-size: 13px;
+  color: #777777;
+}

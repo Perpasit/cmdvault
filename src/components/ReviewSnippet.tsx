@@ -5,6 +5,7 @@ import {
 
 import type { Snippet } from "../data/mockSnippets";
 import CreatableSelect from "./CreatableSelect";
+import type { Collection } from "./Sidebar";
 
 type SuggestedVariable = {
     id: number;
@@ -22,7 +23,8 @@ type ReviewSnippetProps = {
         snippet: Omit<
             Snippet,
             "id" | "createdAt"
-        >
+        >,
+        collectionIds: number[]
     ) => void;
 
     toolOptions: string[];
@@ -32,6 +34,8 @@ type ReviewSnippetProps = {
     getCategoryOptions: (
         tool: string
     ) => string[];
+
+    collections: Collection[];
 };
 
 export default function ReviewSnippet({
@@ -41,6 +45,7 @@ export default function ReviewSnippet({
     toolOptions,
     environmentOptions,
     getCategoryOptions,
+    collections,
 }: ReviewSnippetProps) {
     const [title, setTitle] =
         useState("Untitled Snippet");
@@ -65,6 +70,11 @@ export default function ReviewSnippet({
 
     const [tags, setTags] =
         useState("");
+
+    const [
+        selectedCollectionIds,
+        setSelectedCollectionIds,
+    ] = useState<number[]>([]);
 
     /*
      * Mock Suggested Variables
@@ -209,6 +219,26 @@ export default function ReviewSnippet({
         setCategory("");
     };
 
+    const toggleCollection = (
+        collectionId: number
+    ) => {
+        setSelectedCollectionIds(
+            (current) =>
+                current.includes(
+                    collectionId
+                )
+                    ? current.filter(
+                        (id) =>
+                            id !==
+                            collectionId
+                    )
+                    : [
+                        ...current,
+                        collectionId,
+                    ]
+        );
+    };
+
     const handleSave = () => {
         const parsedTags =
             tags
@@ -218,27 +248,21 @@ export default function ReviewSnippet({
                 )
                 .filter(Boolean);
 
-        onSave({
-            title:
-                title.trim(),
-
-            tool:
-                tool.trim(),
-
-            environment:
-                environment.trim(),
-
-            category:
-                category.trim(),
-
-            description:
-                description.trim(),
-
-            template,
-
-            tags:
-                parsedTags,
-        });
+        onSave(
+            {
+                title: title.trim(),
+                tool: tool.trim(),
+                environment:
+                    environment.trim(),
+                category:
+                    category.trim(),
+                description:
+                    description.trim(),
+                template,
+                tags: parsedTags,
+            },
+            selectedCollectionIds
+        );
     };
 
     return (
@@ -388,19 +412,57 @@ export default function ReviewSnippet({
 
                             <textarea
                                 className="description-input"
-                                value={
-                                    description
-                                }
-                                onChange={(
-                                    event
-                                ) =>
+                                value={description}
+                                onChange={(event) =>
                                     setDescription(
-                                        event
-                                            .target
-                                            .value
+                                        event.target.value
                                     )
                                 }
                             />
+                        </div>
+                        <div className="form-group full-width">
+                            <label>
+                                Collections
+                            </label>
+
+                            {collections.length > 0 ? (
+                                <div className="collection-options">
+                                    {collections.map(
+                                        (collection) => (
+                                            <label
+                                                className="collection-option"
+                                                key={
+                                                    collection.id
+                                                }
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={
+                                                        selectedCollectionIds.includes(
+                                                            collection.id
+                                                        )
+                                                    }
+                                                    onChange={() =>
+                                                        toggleCollection(
+                                                            collection.id
+                                                        )
+                                                    }
+                                                />
+
+                                                <span>
+                                                    {
+                                                        collection.name
+                                                    }
+                                                </span>
+                                            </label>
+                                        )
+                                    )}
+                                </div>
+                            ) : (
+                                <span className="form-hint">
+                                    No collections yet.
+                                </span>
+                            )}
                         </div>
                     </div>
                 </section>
