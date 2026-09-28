@@ -20,6 +20,15 @@ import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import CreateCollectionModal from "./components/CreateCollectionModal";
 import RenameCollectionModal from "./components/RenameCollectionModal";
 import Settings from "./components/Settings";
+import {
+  save,
+  open,
+} from "@tauri-apps/plugin-dialog";
+
+import {
+  writeTextFile,
+  readTextFile,
+} from "@tauri-apps/plugin-fs";
 
 import type { Snippet } from "./data/mockSnippets";
 import { invoke } from "@tauri-apps/api/core";
@@ -39,6 +48,21 @@ type AnalyzeResult = {
   variables: AnalyzeVariable[];
   tags: string[];
 };
+
+type ImportPreview = {
+  version: number;
+  exportedAt: string;
+  snippetCount: number;
+  collectionCount: number;
+};
+
+type ImportResult = {
+  importedSnippets: number;
+  skippedSnippets: number;
+  createdCollections: number;
+  reusedCollections: number;
+};
+
 
 type DraftSnippet = {
   content: string;
@@ -288,11 +312,57 @@ function App() {
     setIsEditing(false);
   };
 
+  const handleExportData = async () => {
+    try {
+      const data =
+        await invoke<string>(
+          "export_data"
+        );
+
+      const today =
+        new Date()
+          .toISOString()
+          .slice(0, 10);
+
+      const filePath =
+        await save({
+          defaultPath:
+            `cmdvault-backup-${today}.json`,
+
+          filters: [
+            {
+              name: "CmdVault Backup",
+              extensions: ["json"],
+            },
+          ],
+        });
+
+      if (!filePath) {
+        return;
+      }
+
+      await writeTextFile(
+        filePath,
+        data
+      );
+
+      console.log(
+        "CmdVault backup saved:",
+        filePath
+      );
+    } catch (error) {
+      console.error(
+        "Failed to export data:",
+        error
+      );
+    }
+  };
+
   /*
    * Load snippets from SQLite
    */
-  useEffect(() => {
-    const loadSnippets = async () => {
+  const loadSnippets = useCallback(
+    async () => {
       try {
         const databaseSnippets =
           await invoke<
@@ -332,38 +402,129 @@ function App() {
           error
         );
       }
-    };
-
-    loadSnippets();
-  }, []);
-
+    },
+    []
+  );
   /*
-   * Load Collections from SQLite
-   */
+ * Load Collections from SQLite
+ */
+  const loadCollections = useCallback(
+    async () => {
+      try {
+        const databaseCollections =
+          await invoke<
+            Collection[]
+          >(
+            "get_collections"
+          );
+
+        setCollectionList(
+          databaseCollections
+        );
+      } catch (error) {
+        console.error(
+          "Failed to load collections:",
+          error
+        );
+      }
+    },
+    []
+  );
+
   useEffect(() => {
-    const loadCollections =
-      async () => {
-        try {
-          const databaseCollections =
-            await invoke<
-              Collection[]
-            >(
-              "get_collections"
-            );
-
-          setCollectionList(
-            databaseCollections
-          );
-        } catch (error) {
-          console.error(
-            "Failed to load collections:",
-            error
-          );
-        }
-      };
-
     loadCollections();
-  }, []);
+  }, [loadCollections]);
+
+  useEffect(() => {
+    loadSnippets();
+  }, [loadSnippets]);
+
+  const handleImportData = async () => {
+    try {
+      const filePath =
+        await open({
+          multiple: false,
+          filters: [
+            {
+              name: "CmdVault Backup",
+              extensions: ["json"],
+            },
+          ],
+        });
+
+      if (!filePath) {
+        return;
+      }
+
+      const data =
+        await readTextFile(filePath);
+
+      /*
+       * Validate first.
+       */
+      const preview =
+        await invoke<ImportPreview>(
+          "validate_import_data",
+          {
+            data,
+          }
+        );
+
+      const confirmed =
+        window.confirm(
+          `Import CmdVault backup?\n\n` +
+          `${preview.snippetCount} snippets\n` +
+          `${preview.collectionCount} collections\n\n` +
+          `Existing data will be kept.`
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      /*
+       * Import into SQLite.
+       */
+      const result =
+        await invoke<ImportResult>(
+          "import_data",
+          {
+            data,
+          }
+        );
+
+      console.log(
+        "Import result:",
+        result
+      );
+
+      /*
+       * Refresh data after import.
+       */
+      await Promise.all([
+        loadSnippets(),
+        loadCollections(),
+      ]);
+
+      window.alert(
+        `Import completed.\n\n` +
+        `Imported snippets: ${result.importedSnippets}\n` +
+        `Skipped duplicates: ${result.skippedSnippets}\n` +
+        `Created collections: ${result.createdCollections}\n` +
+        `Reused collections: ${result.reusedCollections}`
+      );
+    } catch (error) {
+      console.error(
+        "Failed to import data:",
+        error
+      );
+
+      window.alert(
+        `Import failed.\n\n${String(error)}`
+      );
+    }
+  };
+
 
   /*
    * Create Collection
@@ -1446,6 +1607,8 @@ function App() {
             onTestConnection={
               checkAiHealth
             }
+            onExportData={handleExportData}
+            onImportData={handleImportData}
           />
         </main>
       </div>

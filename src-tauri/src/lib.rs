@@ -53,6 +53,69 @@ struct AnalyzeResult {
     tags: Vec<String>,
 }
 
+/*
+ * ============================================================
+ * Export Schema
+ * ============================================================
+ */
+
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase")]
+struct ExportSnippet {
+    title: String,
+    tool: String,
+    environment: String,
+    category: String,
+    description: String,
+    template: String,
+    tags: Vec<String>,
+    created_at: String,
+    collections: Vec<String>,
+}
+
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase")]
+struct ExportCollection {
+    name: String,
+    created_at: String,
+}
+
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase")]
+struct ExportData {
+    version: u32,
+    exported_at: String,
+    collections: Vec<ExportCollection>,
+    snippets: Vec<ExportSnippet>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ImportPreview {
+    version: u32,
+    exported_at: String,
+    snippet_count: usize,
+    collection_count: usize,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ImportResult {
+    imported_snippets: usize,
+    skipped_snippets: usize,
+    created_collections: usize,
+    reused_collections: usize,
+}
+
 fn build_analyze_prompt(content: &str) -> String {
     format!(
         r#"
@@ -225,9 +288,7 @@ struct SnippetCollectionInput {
  * ============================================================
  */
 
-fn get_database_path(
-    app: &tauri::AppHandle,
-) -> Result<std::path::PathBuf, String> {
+fn get_database_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let app_data_dir = app
         .path()
         .app_data_dir()
@@ -242,69 +303,39 @@ fn get_database_path(
  * ============================================================
  */
 
-
 #[tauri::command]
-fn check_ai_health(
-    server_url: String,
-    model: String,
-) -> Result<(), String> {
-    let server_url =
-        server_url.trim().trim_end_matches('/');
+fn check_ai_health(server_url: String, model: String) -> Result<(), String> {
+    let server_url = server_url.trim().trim_end_matches('/');
 
     let model = model.trim();
 
     if server_url.is_empty() {
-        return Err(
-            "Server URL is required."
-                .to_string()
-        );
+        return Err("Server URL is required.".to_string());
     }
 
     if model.is_empty() {
-        return Err(
-            "Model is required."
-                .to_string()
-        );
+        return Err("Model is required.".to_string());
     }
 
-    let client =
-        reqwest::blocking::Client::builder()
-            .timeout(
-                std::time::Duration::from_secs(3)
-            )
-            .build()
-            .map_err(|error| {
-                format!(
-                    "Failed to create HTTP client: {}",
-                    error
-                )
-            })?;
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(|error| format!("Failed to create HTTP client: {}", error))?;
 
-    let url =
-        format!("{}/api/tags", server_url);
+    let url = format!("{}/api/tags", server_url);
 
     let response = client
         .get(url)
         .send()
-        .map_err(|_| {
-            "Local AI is unavailable."
-                .to_string()
-        })?;
+        .map_err(|_| "Local AI is unavailable.".to_string())?;
 
     if !response.status().is_success() {
-        return Err(
-            "Local AI is unavailable."
-                .to_string()
-        );
+        return Err("Local AI is unavailable.".to_string());
     }
 
-    let body: serde_json::Value =
-        response
-            .json()
-            .map_err(|_| {
-                "Failed to read Ollama models."
-                    .to_string()
-            })?;
+    let body: serde_json::Value = response
+        .json()
+        .map_err(|_| "Failed to read Ollama models.".to_string())?;
 
     let model_exists = body["models"]
         .as_array()
@@ -319,12 +350,7 @@ fn check_ai_health(
         .unwrap_or(false);
 
     if !model_exists {
-        return Err(
-            format!(
-                "Model '{}' is not installed.",
-                model
-            )
-        );
+        return Err(format!("Model '{}' is not installed.", model));
     }
 
     Ok(())
@@ -336,135 +362,84 @@ fn analyze_snippet(
     server_url: String,
     model: String,
 ) -> Result<AnalyzeResult, String> {
-    let trimmed_content =
-        content.trim();
+    let trimmed_content = content.trim();
 
-    let server_url =
-    server_url.trim().trim_end_matches('/');
+    let server_url = server_url.trim().trim_end_matches('/');
 
-    let model =
-    model.trim();
+    let model = model.trim();
 
     if server_url.is_empty() {
-        return Err(
-            "Server URL is required."
-                .to_string()
-        );
+        return Err("Server URL is required.".to_string());
     }
 
     if model.is_empty() {
-        return Err(
-            "Model is required."
-                .to_string()
-        );
+        return Err("Model is required.".to_string());
     }
 
-    let generate_url =
-        format!(
-            "{}/api/generate",
-            server_url
-        );
+    let generate_url = format!("{}/api/generate", server_url);
 
     /*
      * Build prompt
      */
-    let prompt =
-        build_analyze_prompt(
-            trimmed_content,
-        );
+    let prompt = build_analyze_prompt(trimmed_content);
 
     /*
      * Prepare Ollama request
      */
-    let request =
-        OllamaGenerateRequest {
-            model:
-                model.to_string(),
-            prompt,
-            stream: false,
-        };
+    let request = OllamaGenerateRequest {
+        model: model.to_string(),
+        prompt,
+        stream: false,
+    };
 
     /*
      * Send request to local Ollama
      */
-    let client =
-    reqwest::blocking::Client::builder()
-        .timeout(
-            std::time::Duration::from_secs(120)
-        )
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
         .build()
-        .map_err(|error| {
-            format!(
-                "Failed to create HTTP client: {}",
-                error
-            )
-        })?;
+        .map_err(|error| format!("Failed to create HTTP client: {}", error))?;
 
     let response = client
         .post(&generate_url)
         .json(&request)
         .send()
-        .map_err(|error| {
-            format!(
-                "Failed to connect to local AI:\n{:#?}",
-                error
-            )
-        })?;
+        .map_err(|error| format!("Failed to connect to local AI:\n{:#?}", error))?;
 
     /*
      * Check HTTP status
      */
     if !response.status().is_success() {
-        return Err(
-            format!(
-                "Local AI returned HTTP {}",
-                response.status()
-            )
-        );
+        return Err(format!("Local AI returned HTTP {}", response.status()));
     }
 
     /*
      * Read Ollama response
      */
-    let ollama_result =
-        response
-            .json::<OllamaGenerateResponse>()
-            .map_err(|error| {
-                format!(
-                    "Failed to read local AI response: {}",
-                    error
-                )
-            })?;
+    let ollama_result = response
+        .json::<OllamaGenerateResponse>()
+        .map_err(|error| format!("Failed to read local AI response: {}", error))?;
 
     if !ollama_result.done {
-        return Err(
-            "Local AI response did not complete."
-                .to_string(),
-        );
+        return Err("Local AI response did not complete.".to_string());
     }
 
     /*
      * Ollama returns the generated JSON
      * inside the "response" field.
      */
-    let ai_output =
-        ollama_result.response.trim();
+    let ai_output = ollama_result.response.trim();
 
     /*
      * Parse generated JSON into
      * our AnalyzeResult schema.
      */
-    let result =
-        serde_json::from_str::<
-            AnalyzeResult
-        >(ai_output)
-        .map_err(|error| {
-            format!(
-                "Failed to parse AI response as JSON: {}\n\nAI response:\n{}",
-                error,
-                ai_output
-            )
-        })?;
+    let result = serde_json::from_str::<AnalyzeResult>(ai_output).map_err(|error| {
+        format!(
+            "Failed to parse AI response as JSON: {}\n\nAI response:\n{}",
+            error, ai_output
+        )
+    })?;
 
     Ok(result)
 }
@@ -476,15 +451,10 @@ fn analyze_snippet(
  */
 
 #[tauri::command]
-fn create_snippet(
-    app: tauri::AppHandle,
-    input: CreateSnippetInput,
-) -> Result<i64, String> {
-    let database_path =
-        get_database_path(&app)?;
+fn create_snippet(app: tauri::AppHandle, input: CreateSnippetInput) -> Result<i64, String> {
+    let database_path = get_database_path(&app)?;
 
-    let tags =
-        input.tags.join(",");
+    let tags = input.tags.join(",");
 
     database::create_snippet(
         &database_path,
@@ -501,28 +471,17 @@ fn create_snippet(
 }
 
 #[tauri::command]
-fn get_snippets(
-    app: tauri::AppHandle,
-) -> Result<Vec<database::Snippet>, String> {
-    let database_path =
-        get_database_path(&app)?;
+fn get_snippets(app: tauri::AppHandle) -> Result<Vec<database::Snippet>, String> {
+    let database_path = get_database_path(&app)?;
 
-    database::get_snippets(
-        &database_path,
-    )
-    .map_err(|error| error.to_string())
+    database::get_snippets(&database_path).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-fn update_snippet(
-    app: tauri::AppHandle,
-    input: UpdateSnippetInput,
-) -> Result<(), String> {
-    let database_path =
-        get_database_path(&app)?;
+fn update_snippet(app: tauri::AppHandle, input: UpdateSnippetInput) -> Result<(), String> {
+    let database_path = get_database_path(&app)?;
 
-    let tags =
-        input.tags.join(",");
+    let tags = input.tags.join(",");
 
     database::update_snippet(
         &database_path,
@@ -539,18 +498,10 @@ fn update_snippet(
 }
 
 #[tauri::command]
-fn delete_snippet(
-    app: tauri::AppHandle,
-    id: i64,
-) -> Result<(), String> {
-    let database_path =
-        get_database_path(&app)?;
+fn delete_snippet(app: tauri::AppHandle, id: i64) -> Result<(), String> {
+    let database_path = get_database_path(&app)?;
 
-    database::delete_snippet(
-        &database_path,
-        id,
-    )
-    .map_err(|error| error.to_string())
+    database::delete_snippet(&database_path, id).map_err(|error| error.to_string())
 }
 
 /*
@@ -560,83 +511,44 @@ fn delete_snippet(
  */
 
 #[tauri::command]
-fn create_collection(
-    app: tauri::AppHandle,
-    input: CreateCollectionInput,
-) -> Result<i64, String> {
-    let database_path =
-        get_database_path(&app)?;
+fn create_collection(app: tauri::AppHandle, input: CreateCollectionInput) -> Result<i64, String> {
+    let database_path = get_database_path(&app)?;
 
-    let name =
-        input.name.trim();
+    let name = input.name.trim();
 
     if name.is_empty() {
-        return Err(
-            "Collection name cannot be empty."
-                .to_string(),
-        );
+        return Err("Collection name cannot be empty.".to_string());
     }
 
-    database::create_collection(
-        &database_path,
-        name,
-        &input.created_at,
-    )
-    .map_err(|error| error.to_string())
+    database::create_collection(&database_path, name, &input.created_at)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-fn get_collections(
-    app: tauri::AppHandle,
-) -> Result<Vec<database::Collection>, String> {
-    let database_path =
-        get_database_path(&app)?;
+fn get_collections(app: tauri::AppHandle) -> Result<Vec<database::Collection>, String> {
+    let database_path = get_database_path(&app)?;
 
-    database::get_collections(
-        &database_path,
-    )
-    .map_err(|error| error.to_string())
+    database::get_collections(&database_path).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-fn rename_collection(
-    app: tauri::AppHandle,
-    input: RenameCollectionInput,
-) -> Result<(), String> {
-    let database_path =
-        get_database_path(&app)?;
+fn rename_collection(app: tauri::AppHandle, input: RenameCollectionInput) -> Result<(), String> {
+    let database_path = get_database_path(&app)?;
 
-    let name =
-        input.name.trim();
+    let name = input.name.trim();
 
     if name.is_empty() {
-        return Err(
-            "Collection name cannot be empty."
-                .to_string(),
-        );
+        return Err("Collection name cannot be empty.".to_string());
     }
 
-    database::rename_collection(
-        &database_path,
-        input.id,
-        name,
-    )
-    .map_err(|error| error.to_string())
+    database::rename_collection(&database_path, input.id, name).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-fn delete_collection(
-    app: tauri::AppHandle,
-    id: i64,
-) -> Result<(), String> {
-    let database_path =
-        get_database_path(&app)?;
+fn delete_collection(app: tauri::AppHandle, id: i64) -> Result<(), String> {
+    let database_path = get_database_path(&app)?;
 
-    database::delete_collection(
-        &database_path,
-        id,
-    )
-    .map_err(|error| error.to_string())
+    database::delete_collection(&database_path, id).map_err(|error| error.to_string())
 }
 
 /*
@@ -650,15 +562,10 @@ fn add_snippet_to_collection(
     app: tauri::AppHandle,
     input: SnippetCollectionInput,
 ) -> Result<(), String> {
-    let database_path =
-        get_database_path(&app)?;
+    let database_path = get_database_path(&app)?;
 
-    database::add_snippet_to_collection(
-        &database_path,
-        input.snippet_id,
-        input.collection_id,
-    )
-    .map_err(|error| error.to_string())
+    database::add_snippet_to_collection(&database_path, input.snippet_id, input.collection_id)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -666,15 +573,10 @@ fn remove_snippet_from_collection(
     app: tauri::AppHandle,
     input: SnippetCollectionInput,
 ) -> Result<(), String> {
-    let database_path =
-        get_database_path(&app)?;
+    let database_path = get_database_path(&app)?;
 
-    database::remove_snippet_from_collection(
-        &database_path,
-        input.snippet_id,
-        input.collection_id,
-    )
-    .map_err(|error| error.to_string())
+    database::remove_snippet_from_collection(&database_path, input.snippet_id, input.collection_id)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -682,14 +584,9 @@ fn get_snippet_collections(
     app: tauri::AppHandle,
     snippet_id: i64,
 ) -> Result<Vec<database::Collection>, String> {
-    let database_path =
-        get_database_path(&app)?;
+    let database_path = get_database_path(&app)?;
 
-    database::get_snippet_collections(
-        &database_path,
-        snippet_id,
-    )
-    .map_err(|error| error.to_string())
+    database::get_snippet_collections(&database_path, snippet_id).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -697,14 +594,230 @@ fn get_collection_snippet_ids(
     app: tauri::AppHandle,
     collection_id: i64,
 ) -> Result<Vec<i64>, String> {
+    let database_path = get_database_path(&app)?;
+
+    database::get_collection_snippet_ids(&database_path, collection_id)
+        .map_err(|error| error.to_string())
+}
+
+/*
+ * ============================================================
+ * Import / Export Commands
+ * ============================================================
+ */
+
+#[tauri::command]
+fn export_data(app: tauri::AppHandle) -> Result<String, String> {
+    let database_path = get_database_path(&app)?;
+
+    let snippets = database::get_snippets(&database_path).map_err(|error| error.to_string())?;
+
+    let collections =
+        database::get_collections(&database_path).map_err(|error| error.to_string())?;
+
+    let export_collections = collections
+        .into_iter()
+        .map(|collection| ExportCollection {
+            name: collection.name,
+            created_at: collection.created_at,
+        })
+        .collect();
+
+    let mut export_snippets = Vec::new();
+
+    for snippet in snippets {
+        let snippet_collections = database::get_snippet_collections(&database_path, snippet.id)
+            .map_err(|error| error.to_string())?;
+
+        let collection_names = snippet_collections
+            .into_iter()
+            .map(|collection| collection.name)
+            .collect();
+
+        export_snippets.push(ExportSnippet {
+            title: snippet.title,
+            tool: snippet.tool,
+            environment: snippet.environment,
+            category: snippet.category,
+            description: snippet.description,
+            template: snippet.template,
+            tags: snippet.tags,
+            created_at: snippet.created_at,
+            collections: collection_names,
+        });
+    }
+
+    let export = ExportData {
+        version: 1,
+
+        exported_at:
+        chrono::Utc::now().to_rfc3339(),
+
+        collections: export_collections,
+
+        snippets: export_snippets,
+    };
+
+    serde_json::to_string_pretty(&export)
+        .map_err(|error| format!("Failed to create export: {}", error))
+}
+
+#[tauri::command]
+fn validate_import_data(
+    data: String,
+) -> Result<ImportPreview, String> {
+    let import_data:
+        ExportData =
+        serde_json::from_str(&data)
+            .map_err(|error| {
+                format!(
+                    "Invalid CmdVault backup file: {}",
+                    error
+                )
+            })?;
+
+    if import_data.version != 1 {
+        return Err(format!(
+            "Unsupported backup version: {}",
+            import_data.version
+        ));
+    }
+
+    Ok(ImportPreview {
+        version:
+            import_data.version,
+
+        exported_at:
+            import_data.exported_at,
+
+        snippet_count:
+            import_data.snippets.len(),
+
+        collection_count:
+            import_data.collections.len(),
+    })
+}
+
+#[tauri::command]
+fn import_data(
+    app: tauri::AppHandle,
+    data: String,
+) -> Result<ImportResult, String> {
+    /*
+     * Parse backup
+     */
+    let import_data:
+        ExportData =
+        serde_json::from_str(&data)
+            .map_err(|error| {
+                format!(
+                    "Invalid CmdVault backup file: {}",
+                    error
+                )
+            })?;
+
+    /*
+     * Validate backup version
+     */
+    if import_data.version != 1 {
+        return Err(format!(
+            "Unsupported backup version: {}",
+            import_data.version
+        ));
+    }
+
     let database_path =
         get_database_path(&app)?;
 
-    database::get_collection_snippet_ids(
-        &database_path,
-        collection_id,
-    )
-    .map_err(|error| error.to_string())
+    /*
+     * Convert backup collections
+     * into database import models.
+     */
+    let collections =
+        import_data
+            .collections
+            .into_iter()
+            .map(|collection| {
+                database::ImportCollection {
+                    name:
+                        collection.name,
+
+                    created_at:
+                        collection.created_at,
+                }
+            })
+            .collect();
+
+    /*
+     * Convert backup snippets
+     * into database import models.
+     */
+    let snippets =
+        import_data
+            .snippets
+            .into_iter()
+            .map(|snippet| {
+                database::ImportSnippet {
+                    title:
+                        snippet.title,
+
+                    tool:
+                        snippet.tool,
+
+                    environment:
+                        snippet.environment,
+
+                    category:
+                        snippet.category,
+
+                    description:
+                        snippet.description,
+
+                    template:
+                        snippet.template,
+
+                    tags:
+                        snippet.tags,
+
+                    created_at:
+                        snippet.created_at,
+
+                    collections:
+                        snippet.collections,
+                }
+            })
+            .collect();
+
+    /*
+     * Everything below this point is handled
+     * inside one SQLite transaction.
+     */
+    let result =
+        database::import_data(
+            &database_path,
+            collections,
+            snippets,
+        )
+        .map_err(|error| {
+            format!(
+                "Failed to import backup: {}",
+                error
+            )
+        })?;
+
+    Ok(ImportResult {
+        imported_snippets:
+            result.imported_snippets,
+
+        skipped_snippets:
+            result.skipped_snippets,
+
+        created_collections:
+            result.created_collections,
+
+        reused_collections:
+            result.reused_collections,
+    })
 }
 
 /*
@@ -713,19 +826,16 @@ fn get_collection_snippet_ids(
  * ============================================================
  */
 
-#[cfg_attr(
-    mobile,
-    tauri::mobile_entry_point
-)]
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
-                        .level(
-                            log::LevelFilter::Info,
-                        )
+                        .level(log::LevelFilter::Info)
                         .build(),
                 )?;
             }
@@ -733,68 +843,50 @@ pub fn run() {
             let app_data_dir = app
                 .path()
                 .app_data_dir()
-                .expect(
-                    "failed to get app data directory",
-                );
+                .expect("failed to get app data directory");
 
-            std::fs::create_dir_all(
-                &app_data_dir,
-            )
-            .expect(
-                "failed to create app data directory",
-            );
+            std::fs::create_dir_all(&app_data_dir).expect("failed to create app data directory");
 
-            let database_path =
-                app_data_dir.join(
-                    "cmdvault.db",
-                );
+            let database_path = app_data_dir.join("cmdvault.db");
 
-            database::initialize_database(
-                &database_path,
-            )
-            .expect(
-                "failed to initialize database",
-            );
+            database::initialize_database(&database_path).expect("failed to initialize database");
 
             Ok(())
         })
-        .invoke_handler(
-            tauri::generate_handler![
-                /*
-                 * Snippets
-                 */
-                create_snippet,
-                get_snippets,
-                update_snippet,
-                delete_snippet,
-                check_ai_health,
-
-                /*
-                 * Collections
-                 */
-                create_collection,
-                get_collections,
-                rename_collection,
-                delete_collection,
-
-                /*
-                 * Relationships
-                 */
-                add_snippet_to_collection,
-                remove_snippet_from_collection,
-                get_snippet_collections,
-                get_collection_snippet_ids,
-
-                /*
-                * Local AI
-                */
-                analyze_snippet
-            ],
-        )
-        .run(
-            tauri::generate_context!(),
-        )
-        .expect(
-            "error while running tauri application",
-        );
+        .invoke_handler(tauri::generate_handler![
+            /*
+             * Snippets
+             */
+            create_snippet,
+            get_snippets,
+            update_snippet,
+            delete_snippet,
+            check_ai_health,
+            /*
+             * Collections
+             */
+            create_collection,
+            get_collections,
+            rename_collection,
+            delete_collection,
+            /*
+             * Relationships
+             */
+            add_snippet_to_collection,
+            remove_snippet_from_collection,
+            get_snippet_collections,
+            get_collection_snippet_ids,
+            /*
+             * Local AI
+             */
+            analyze_snippet,
+            /*
+             * Import / Export
+             */
+            export_data,
+            validate_import_data,
+            import_data   
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

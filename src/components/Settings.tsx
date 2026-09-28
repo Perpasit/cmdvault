@@ -17,6 +17,10 @@ type SettingsProps = {
     ) => void;
 
     onTestConnection: () => void;
+
+    onExportData: () => void;
+
+    onImportData: () => void;
 };
 
 export default function Settings({
@@ -26,6 +30,8 @@ export default function Settings({
     onServerUrlChange,
     onModelChange,
     onTestConnection,
+    onExportData,
+    onImportData,
 }: SettingsProps) {
     return (
         <div className="settings-page">
@@ -129,6 +135,58 @@ export default function Settings({
                     Changes are saved
                     automatically.
                 </p>
+            </section>
+            <section className="settings-section">
+                <div className="settings-section-header">
+                    <h2>Data</h2>
+
+                    <p>
+                        Back up or transfer your
+                        CmdVault data.
+                    </p>
+                </div>
+
+                <div className="settings-data-row">
+                    <div>
+                        <strong>
+                            Export Data
+                        </strong>
+
+                        <p className="settings-help">
+                            Export your snippets and
+                            collections as a CmdVault
+                            backup file.
+                        </p>
+                    </div>
+
+                    <button
+                        className="secondary-button"
+                        onClick={onExportData}
+                    >
+                        Export Data
+                    </button>
+                </div>
+
+                <div className="settings-data-row">
+                    <div>
+                        <strong>
+                            Import Data
+                        </strong>
+
+                        <p className="settings-help">
+                            Restore snippets and
+                            collections from a CmdVault
+                            backup file.
+                        </p>
+                    </div>
+
+                    <button
+                        className="secondary-button"
+                        onClick={onImportData}
+                    >
+                        Import Data
+                    </button>
+                </div>
             </section>
         </div>
     );

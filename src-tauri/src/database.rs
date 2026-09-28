@@ -23,9 +23,35 @@ pub struct Collection {
     pub created_at: String,
 }
 
-pub fn initialize_database(
-    database_path: &Path,
-) -> Result<()> {
+#[derive(Debug)]
+pub struct ImportSnippet {
+    pub title: String,
+    pub tool: String,
+    pub environment: String,
+    pub category: String,
+    pub description: String,
+    pub template: String,
+    pub tags: Vec<String>,
+    pub created_at: String,
+    pub collections: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct ImportCollection {
+    pub name: String,
+    pub created_at: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    pub imported_snippets: usize,
+    pub skipped_snippets: usize,
+    pub created_collections: usize,
+    pub reused_collections: usize,
+}
+
+pub fn initialize_database(database_path: &Path) -> Result<()> {
     let connection = Connection::open(database_path)?;
 
     /*
@@ -131,9 +157,7 @@ pub fn create_snippet(
     Ok(connection.last_insert_rowid())
 }
 
-pub fn get_snippets(
-    database_path: &Path,
-) -> Result<Vec<Snippet>> {
+pub fn get_snippets(database_path: &Path) -> Result<Vec<Snippet>> {
     let connection = Connection::open(database_path)?;
 
     let mut statement = connection.prepare(
@@ -168,9 +192,7 @@ pub fn get_snippets(
             tags: if tags.is_empty() {
                 Vec::new()
             } else {
-                tags.split(",")
-                    .map(|tag| tag.trim().to_string())
-                    .collect()
+                tags.split(",").map(|tag| tag.trim().to_string()).collect()
             },
 
             created_at: row.get(8)?,
@@ -227,20 +249,12 @@ pub fn update_snippet(
     Ok(())
 }
 
-pub fn delete_snippet(
-    database_path: &Path,
-    id: i64,
-) -> Result<()> {
-    let mut connection =
-        Connection::open(database_path)?;
+pub fn delete_snippet(database_path: &Path, id: i64) -> Result<()> {
+    let mut connection = Connection::open(database_path)?;
 
-    connection.execute(
-        "PRAGMA foreign_keys = ON",
-        [],
-    )?;
+    connection.execute("PRAGMA foreign_keys = ON", [])?;
 
-    let transaction =
-        connection.transaction()?;
+    let transaction = connection.transaction()?;
 
     /*
      * Explicit delete keeps this safe even if
@@ -277,11 +291,7 @@ pub fn delete_snippet(
 /*
  * Create Collection
  */
-pub fn create_collection(
-    database_path: &Path,
-    name: &str,
-    created_at: &str,
-) -> Result<i64> {
+pub fn create_collection(database_path: &Path, name: &str, created_at: &str) -> Result<i64> {
     let connection = Connection::open(database_path)?;
 
     connection.execute(
@@ -292,10 +302,7 @@ pub fn create_collection(
         )
         VALUES (?1, ?2)
         ",
-        (
-            name,
-            created_at,
-        ),
+        (name, created_at),
     )?;
 
     Ok(connection.last_insert_rowid())
@@ -304,9 +311,7 @@ pub fn create_collection(
 /*
  * Get all Collections
  */
-pub fn get_collections(
-    database_path: &Path,
-) -> Result<Vec<Collection>> {
+pub fn get_collections(database_path: &Path) -> Result<Vec<Collection>> {
     let connection = Connection::open(database_path)?;
 
     let mut statement = connection.prepare(
@@ -320,16 +325,13 @@ pub fn get_collections(
         ",
     )?;
 
-    let rows = statement.query_map(
-        [],
-        |row| {
-            Ok(Collection {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                created_at: row.get(2)?,
-            })
-        },
-    )?;
+    let rows = statement.query_map([], |row| {
+        Ok(Collection {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            created_at: row.get(2)?,
+        })
+    })?;
 
     let mut collections = Vec::new();
 
@@ -343,11 +345,7 @@ pub fn get_collections(
 /*
  * Rename Collection
  */
-pub fn rename_collection(
-    database_path: &Path,
-    id: i64,
-    name: &str,
-) -> Result<()> {
+pub fn rename_collection(database_path: &Path, id: i64, name: &str) -> Result<()> {
     let connection = Connection::open(database_path)?;
 
     connection.execute(
@@ -356,10 +354,7 @@ pub fn rename_collection(
         SET name = ?1
         WHERE id = ?2
         ",
-        (
-            name,
-            id,
-        ),
+        (name, id),
     )?;
 
     Ok(())
@@ -368,20 +363,12 @@ pub fn rename_collection(
 /*
  * Delete Collection
  */
-pub fn delete_collection(
-    database_path: &Path,
-    id: i64,
-) -> Result<()> {
-    let mut connection =
-        Connection::open(database_path)?;
+pub fn delete_collection(database_path: &Path, id: i64) -> Result<()> {
+    let mut connection = Connection::open(database_path)?;
 
-    connection.execute(
-        "PRAGMA foreign_keys = ON",
-        [],
-    )?;
+    connection.execute("PRAGMA foreign_keys = ON", [])?;
 
-    let transaction =
-        connection.transaction()?;
+    let transaction = connection.transaction()?;
 
     /*
      * Remove relationships first.
@@ -427,10 +414,7 @@ pub fn add_snippet_to_collection(
 ) -> Result<()> {
     let connection = Connection::open(database_path)?;
 
-    connection.execute(
-        "PRAGMA foreign_keys = ON",
-        [],
-    )?;
+    connection.execute("PRAGMA foreign_keys = ON", [])?;
 
     connection.execute(
         "
@@ -440,10 +424,7 @@ pub fn add_snippet_to_collection(
         )
         VALUES (?1, ?2)
         ",
-        (
-            snippet_id,
-            collection_id,
-        ),
+        (snippet_id, collection_id),
     )?;
 
     Ok(())
@@ -466,10 +447,7 @@ pub fn remove_snippet_from_collection(
             snippet_id = ?1
             AND collection_id = ?2
         ",
-        (
-            snippet_id,
-            collection_id,
-        ),
+        (snippet_id, collection_id),
     )?;
 
     Ok(())
@@ -478,10 +456,7 @@ pub fn remove_snippet_from_collection(
 /*
  * Get Collections belonging to one Snippet.
  */
-pub fn get_snippet_collections(
-    database_path: &Path,
-    snippet_id: i64,
-) -> Result<Vec<Collection>> {
+pub fn get_snippet_collections(database_path: &Path, snippet_id: i64) -> Result<Vec<Collection>> {
     let connection = Connection::open(database_path)?;
 
     let mut statement = connection.prepare(
@@ -503,16 +478,13 @@ pub fn get_snippet_collections(
         ",
     )?;
 
-    let rows = statement.query_map(
-        [snippet_id],
-        |row| {
-            Ok(Collection {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                created_at: row.get(2)?,
-            })
-        },
-    )?;
+    let rows = statement.query_map([snippet_id], |row| {
+        Ok(Collection {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            created_at: row.get(2)?,
+        })
+    })?;
 
     let mut collections = Vec::new();
 
@@ -528,10 +500,7 @@ pub fn get_snippet_collections(
  *
  * We'll use this later for Library filtering.
  */
-pub fn get_collection_snippet_ids(
-    database_path: &Path,
-    collection_id: i64,
-) -> Result<Vec<i64>> {
+pub fn get_collection_snippet_ids(database_path: &Path, collection_id: i64) -> Result<Vec<i64>> {
     let connection = Connection::open(database_path)?;
 
     let mut statement = connection.prepare(
@@ -543,10 +512,7 @@ pub fn get_collection_snippet_ids(
         ",
     )?;
 
-    let rows = statement.query_map(
-        [collection_id],
-        |row| row.get(0),
-    )?;
+    let rows = statement.query_map([collection_id], |row| row.get(0))?;
 
     let mut snippet_ids = Vec::new();
 
@@ -555,4 +521,211 @@ pub fn get_collection_snippet_ids(
     }
 
     Ok(snippet_ids)
+}
+
+pub fn import_data(
+    database_path: &Path,
+    collections: Vec<ImportCollection>,
+    snippets: Vec<ImportSnippet>,
+) -> Result<ImportResult> {
+    let mut connection =
+        Connection::open(database_path)?;
+
+    connection.execute(
+        "PRAGMA foreign_keys = ON",
+        [],
+    )?;
+
+    let transaction =
+        connection.transaction()?;
+
+    let mut created_collections = 0;
+    let mut reused_collections = 0;
+    let mut imported_snippets = 0;
+    let mut skipped_snippets = 0;
+
+    /*
+     * --------------------------------------------------------
+     * Collections
+     * --------------------------------------------------------
+     */
+
+    for collection in &collections {
+        let existing_id =
+            transaction.query_row(
+                "
+                    SELECT id
+                    FROM collections
+                    WHERE name = ?1 COLLATE NOCASE
+                ",
+                [&collection.name],
+                |row| row.get::<_, i64>(0),
+            );
+
+        match existing_id {
+            Ok(_) => {
+                reused_collections += 1;
+            }
+
+            Err(
+                rusqlite::Error::QueryReturnedNoRows,
+            ) => {
+                transaction.execute(
+                    "
+                        INSERT INTO collections (
+                            name,
+                            created_at
+                        )
+                        VALUES (?1, ?2)
+                    ",
+                    (
+                        &collection.name,
+                        &collection.created_at,
+                    ),
+                )?;
+
+                created_collections += 1;
+            }
+
+            Err(error) => {
+                return Err(error);
+            }
+        }
+    }
+
+    /*
+     * --------------------------------------------------------
+     * Snippets
+     * --------------------------------------------------------
+     */
+
+    for snippet in &snippets {
+        /*
+         * V1 duplicate rule:
+         *
+         * A snippet is considered the same when its
+         * title + template are identical.
+         */
+
+        let existing_snippet =
+            transaction.query_row(
+                "
+                    SELECT id
+                    FROM snippets
+                    WHERE title = ?1
+                      AND template = ?2
+                    LIMIT 1
+                ",
+                (
+                    &snippet.title,
+                    &snippet.template,
+                ),
+                |row| row.get::<_, i64>(0),
+            );
+
+        let snippet_id =
+            match existing_snippet {
+                Ok(id) => {
+                    skipped_snippets += 1;
+                    id
+                }
+
+                Err(
+                    rusqlite::Error::QueryReturnedNoRows,
+                ) => {
+                    let tags =
+                        snippet.tags.join(",");
+
+                    transaction.execute(
+                        "
+                            INSERT INTO snippets (
+                                title,
+                                tool,
+                                environment,
+                                category,
+                                description,
+                                template,
+                                tags,
+                                created_at
+                            )
+                            VALUES (
+                                ?1, ?2, ?3, ?4,
+                                ?5, ?6, ?7, ?8
+                            )
+                        ",
+                        (
+                            &snippet.title,
+                            &snippet.tool,
+                            &snippet.environment,
+                            &snippet.category,
+                            &snippet.description,
+                            &snippet.template,
+                            &tags,
+                            &snippet.created_at,
+                        ),
+                    )?;
+
+                    imported_snippets += 1;
+
+                    transaction.last_insert_rowid()
+                }
+
+                Err(error) => {
+                    return Err(error);
+                }
+            };
+
+        /*
+         * ----------------------------------------------------
+         * Relationships
+         * ----------------------------------------------------
+         *
+         * This also runs for duplicate snippets.
+         *
+         * Example:
+         * - Snippet already exists locally
+         * - Backup says it belongs to "Trouble Shoot"
+         *
+         * We preserve/merge that relationship.
+         */
+
+        for collection_name
+            in &snippet.collections
+        {
+            let collection_id =
+                transaction.query_row(
+                    "
+                        SELECT id
+                        FROM collections
+                        WHERE name = ?1 COLLATE NOCASE
+                    ",
+                    [collection_name],
+                    |row| row.get::<_, i64>(0),
+                )?;
+
+            transaction.execute(
+                "
+                    INSERT OR IGNORE
+                    INTO snippet_collections (
+                        snippet_id,
+                        collection_id
+                    )
+                    VALUES (?1, ?2)
+                ",
+                (
+                    snippet_id,
+                    collection_id,
+                ),
+            )?;
+        }
+    }
+
+    transaction.commit()?;
+
+    Ok(ImportResult {
+        imported_snippets,
+        skipped_snippets,
+        created_collections,
+        reused_collections,
+    })
 }
