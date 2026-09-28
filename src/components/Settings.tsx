@@ -1,3 +1,5 @@
+import AiConnectionTest from "./AiConnectionTest";
+
 type AiStatus =
     | "checking"
     | "ready"
@@ -16,7 +18,7 @@ type SettingsProps = {
         value: string
     ) => void;
 
-    onTestConnection: () => void;
+    onTestConnection: () => Promise<boolean>;
 
     onExportData: () => void;
 
@@ -103,32 +105,12 @@ export default function Settings({
                 </div>
 
                 <div className="settings-connection">
-                    <div
-                        className={`ai-status ai-status-${aiStatus}`}
-                    >
-                        <span className="ai-status-dot" />
-
-                        <span>
-                            {aiStatus === "ready"
-                                ? "AI Ready"
-                                : aiStatus === "offline"
-                                    ? "AI Offline"
-                                    : "Checking AI"}
-                        </span>
-                    </div>
-
-                    <button
-                        className="secondary-button"
-                        onClick={
+                    <AiConnectionTest
+                        aiStatus={aiStatus}
+                        onTestConnection={
                             onTestConnection
                         }
-                        disabled={
-                            aiStatus ===
-                            "checking"
-                        }
-                    >
-                        Test Connection
-                    </button>
+                    />
                 </div>
 
                 <p className="settings-save-note">
@@ -136,6 +118,7 @@ export default function Settings({
                     automatically.
                 </p>
             </section>
+
             <section className="settings-section">
                 <div className="settings-section-header">
                     <h2>Data</h2>

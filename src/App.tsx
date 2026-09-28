@@ -28,6 +28,7 @@ import ImportConfirmModal from "./components/ImportConfirmModal";
 import ImportResultModal from "./components/ImportResultModal";
 import ExportResultModal from "./components/ExportResultModal";
 import ErrorModal from "./components/ErrorModal";
+import FirstRunSetup from "./components/FirstRunSetup";
 
 import {
   writeTextFile,
@@ -184,7 +185,25 @@ const DEFAULT_CATEGORY_OPTIONS: Record<
   ],
 };
 
+const FIRST_RUN_KEY = "cmdvault.setup.completed";
+
 function App() {
+  const [isFirstRun, setIsFirstRun] =
+    useState(
+      () =>
+        localStorage.getItem(
+          FIRST_RUN_KEY
+        ) !== "true"
+    );
+
+  const handleCompleteSetup = () => {
+    localStorage.setItem(
+      FIRST_RUN_KEY,
+      "true"
+    );
+
+    setIsFirstRun(false);
+  };
   const [sortBy, setSortBy] =
     useState("newest");
 
@@ -1129,7 +1148,7 @@ function App() {
  * Local AI Health
  */
   const checkAiHealth =
-    useCallback(async () => {
+    useCallback(async (): Promise<boolean> => {
       setAiStatus("checking");
 
       try {
@@ -1140,7 +1159,9 @@ function App() {
             model: aiModel,
           }
         );
+
         setAiStatus("ready");
+        return true;
       } catch (error) {
         console.warn(
           "Local AI unavailable:",
@@ -1148,6 +1169,7 @@ function App() {
         );
 
         setAiStatus("offline");
+        return false;
       }
     }, [
       aiServerUrl,
@@ -1589,8 +1611,25 @@ function App() {
     };
 
   /*
-* Settings
-*/
+  * First Run Setup
+  */
+  if (isFirstRun) {
+    return (
+      <FirstRunSetup
+        serverUrl={aiServerUrl}
+        model={aiModel}
+        aiStatus={aiStatus}
+        onServerUrlChange={setAiServerUrl}
+        onModelChange={setAiModel}
+        onTestConnection={checkAiHealth}
+        onComplete={handleCompleteSetup}
+      />
+    );
+  }
+
+  /*
+  * Settings
+  */
   if (isSettingsActive) {
     return (
       <div className="app">
