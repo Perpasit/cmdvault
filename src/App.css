@@ -1741,3 +1741,13 @@ textarea:disabled {
   font-size: 12px;
   color: #a94442;
 }
+
+.ai-install-status {
+  margin-top: 12px;
+}
+
+.ai-model-missing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

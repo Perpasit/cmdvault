@@ -1,23 +1,43 @@
 import AiConnectionTest from "./AiConnectionTest";
+import { openUrl } from "@tauri-apps/plugin-opener";
+
+import {
+    AI_PROVIDERS,
+    OLLAMA_MODELS,
+    type OllamaStatus,
+} from "../config/ai";
 
 type FirstRunSetupProps = {
+    provider: string;
     serverUrl: string;
     model: string;
     aiStatus: "checking" | "ready" | "offline";
+    ollamaStatus: OllamaStatus | null;
+
+    onProviderChange: (value: string) => void;
     onServerUrlChange: (value: string) => void;
     onModelChange: (value: string) => void;
     onTestConnection: () => Promise<boolean>;
     onComplete: () => void;
+    isInstallingModel: boolean;
+    installModelError: string | null;
+    onInstallModel: () => Promise<void>;
 };
 
 export default function FirstRunSetup({
+    provider,
     serverUrl,
     model,
     aiStatus,
+    ollamaStatus,
+    onProviderChange,
     onServerUrlChange,
     onModelChange,
     onTestConnection,
     onComplete,
+    isInstallingModel,
+    installModelError,
+    onInstallModel,
 }: FirstRunSetupProps) {
     return (
         <div className="first-run-page">
@@ -54,6 +74,60 @@ export default function FirstRunSetup({
                     </div>
 
                     <label>
+                        Provider
+                    </label>
+
+                    <select
+                        value={provider}
+                        onChange={(event) =>
+                            onProviderChange(
+                                event.target.value
+                            )
+                        }
+                    >
+                        {AI_PROVIDERS.map(
+                            (providerOption) => (
+                                <option
+                                    key={
+                                        providerOption.value
+                                    }
+                                    value={
+                                        providerOption.value
+                                    }
+                                >
+                                    {
+                                        providerOption.label
+                                    }
+                                </option>
+                            )
+                        )}
+                    </select>
+
+                    <label>
+                        Model
+                    </label>
+
+                    <select
+                        value={model}
+                        onChange={(event) =>
+                            onModelChange(
+                                event.target.value
+                            )
+                        }
+                    >
+                        {OLLAMA_MODELS.map(
+                            (modelOption) => (
+                                <option
+                                    key={modelOption}
+                                    value={modelOption}
+                                >
+                                    {modelOption}
+                                </option>
+                            )
+                        )}
+                    </select>
+
+                    <label>
                         Server URL
                     </label>
 
@@ -68,24 +142,66 @@ export default function FirstRunSetup({
                         placeholder="http://127.0.0.1:11434"
                     />
 
-                    <label>
-                        Model
-                    </label>
+                    {ollamaStatus && (
+                        <div className="ai-install-status">
+                            {!ollamaStatus.available ? (
+                                <div className="ai-model-missing">
+                                    <div>
+                                        <div className="ai-test-failed">
+                                            Cannot connect to Ollama
+                                        </div>
 
-                    <input
-                        type="text"
-                        value={model}
-                        onChange={(event) =>
-                            onModelChange(
-                                event.target.value
-                            )
-                        }
-                        placeholder="llama3.1:latest"
-                    />
+                                        <div className="settings-help">
+                                            Make sure Ollama is installed and running.
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        className="secondary-button"
+                                        onClick={() =>
+                                            openUrl(
+                                                "https://ollama.com/download/windows"
+                                            )
+                                        }
+                                    >
+                                        Install Ollama
+                                    </button>
+                                </div>
+                            ) : ollamaStatus.modelInstalled ? (
+                                <span className="ai-test-success">
+                                    ✓ This model is installed
+                                </span>
+                            ) : (
+                                <div className="ai-model-missing">
+                                    <span className="ai-test-failed">
+                                        {model} is not installed
+                                    </span>
+
+                                    <button
+                                        className="secondary-button"
+                                        onClick={onInstallModel}
+                                        disabled={isInstallingModel}
+                                    >
+                                        {isInstallingModel
+                                            ? "Installing..."
+                                            : "Install Model"}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {installModelError && (
+                        <div className="ai-test-failed">
+                            {installModelError}
+                        </div>
+                    )}
 
                     <AiConnectionTest
                         aiStatus={aiStatus}
-                        onTestConnection={onTestConnection}
+                        onTestConnection={
+                            onTestConnection
+                        }
                         buttonClassName="first-run-test-button"
                         showStatus={false}
                     />

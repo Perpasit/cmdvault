@@ -59,10 +59,7 @@ struct AnalyzeResult {
  * ============================================================
  */
 
-#[derive(
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportSnippet {
     title: String,
@@ -76,20 +73,14 @@ struct ExportSnippet {
     collections: Vec<String>,
 }
 
-#[derive(
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportCollection {
     name: String,
     created_at: String,
 }
 
-#[derive(
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportData {
     version: u32,
@@ -297,11 +288,127 @@ fn get_database_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, Strin
     Ok(app_data_dir.join("cmdvault.db"))
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OllamaStatus {
+    available: bool,
+    model_installed: bool,
+}
+
 /*
  * ============================================================
  * Local AI Commands
  * ============================================================
  */
+
+#[tauri::command]
+fn check_ollama_status(server_url: String, model: String) -> Result<OllamaStatus, String> {
+    let server_url = server_url.trim().trim_end_matches('/');
+
+    let model = model.trim();
+
+    if server_url.is_empty() {
+        return Err("Server URL is required.".to_string());
+    }
+
+    if model.is_empty() {
+        return Err("Model is required.".to_string());
+    }
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(|error| format!("Failed to create HTTP client: {}", error))?;
+
+    let url = format!("{}/api/tags", server_url);
+
+    let response = match client.get(url).send() {
+        Ok(response) => response,
+
+        Err(_) => {
+            return Ok(OllamaStatus {
+                available: false,
+                model_installed: false,
+            });
+        }
+    };
+
+    if !response.status().is_success() {
+        return Ok(OllamaStatus {
+            available: false,
+            model_installed: false,
+        });
+    }
+
+    let body: serde_json::Value = response
+        .json()
+        .map_err(|_| "Failed to read Ollama models.".to_string())?;
+
+    let model_installed = body["models"]
+        .as_array()
+        .map(|models| {
+            models.iter().any(|item| {
+                item["name"]
+                    .as_str()
+                    .map(|name| name == model)
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+
+    Ok(OllamaStatus {
+        available: true,
+        model_installed,
+    })
+}
+
+#[derive(serde::Serialize)]
+struct OllamaPullRequest {
+    model: String,
+    stream: bool,
+}
+
+#[tauri::command]
+fn install_ollama_model(server_url: String, model: String) -> Result<(), String> {
+    let server_url = server_url.trim().trim_end_matches('/');
+
+    let model = model.trim();
+
+    if server_url.is_empty() {
+        return Err("Server URL is required.".to_string());
+    }
+
+    if model.is_empty() {
+        return Err("Model is required.".to_string());
+    }
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(1800))
+        .build()
+        .map_err(|error| format!("Failed to create HTTP client: {}", error))?;
+
+    let url = format!("{}/api/pull", server_url);
+
+    let request = OllamaPullRequest {
+        model: model.to_string(),
+        stream: false,
+    };
+
+    let response = client
+        .post(url)
+        .json(&request)
+        .send()
+        .map_err(|error| format!("Failed to connect to Ollama: {}", error))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Failed to install model. Ollama returned HTTP {}",
+            response.status()
+        ));
+    }
+
+    Ok(())
+}
 
 #[tauri::command]
 fn check_ai_health(server_url: String, model: String) -> Result<(), String> {
@@ -650,8 +757,7 @@ fn export_data(app: tauri::AppHandle) -> Result<String, String> {
     let export = ExportData {
         version: 1,
 
-        exported_at:
-        chrono::Utc::now().to_rfc3339(),
+        exported_at: chrono::Utc::now().to_rfc3339(),
 
         collections: export_collections,
 
@@ -663,18 +769,9 @@ fn export_data(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn validate_import_data(
-    data: String,
-) -> Result<ImportPreview, String> {
-    let import_data:
-        ExportData =
-        serde_json::from_str(&data)
-            .map_err(|error| {
-                format!(
-                    "Invalid CmdVault backup file: {}",
-                    error
-                )
-            })?;
+fn validate_import_data(data: String) -> Result<ImportPreview, String> {
+    let import_data: ExportData = serde_json::from_str(&data)
+        .map_err(|error| format!("Invalid CmdVault backup file: {}", error))?;
 
     if import_data.version != 1 {
         return Err(format!(
@@ -684,37 +781,23 @@ fn validate_import_data(
     }
 
     Ok(ImportPreview {
-        version:
-            import_data.version,
+        version: import_data.version,
 
-        exported_at:
-            import_data.exported_at,
+        exported_at: import_data.exported_at,
 
-        snippet_count:
-            import_data.snippets.len(),
+        snippet_count: import_data.snippets.len(),
 
-        collection_count:
-            import_data.collections.len(),
+        collection_count: import_data.collections.len(),
     })
 }
 
 #[tauri::command]
-fn import_data(
-    app: tauri::AppHandle,
-    data: String,
-) -> Result<ImportResult, String> {
+fn import_data(app: tauri::AppHandle, data: String) -> Result<ImportResult, String> {
     /*
      * Parse backup
      */
-    let import_data:
-        ExportData =
-        serde_json::from_str(&data)
-            .map_err(|error| {
-                format!(
-                    "Invalid CmdVault backup file: {}",
-                    error
-                )
-            })?;
+    let import_data: ExportData = serde_json::from_str(&data)
+        .map_err(|error| format!("Invalid CmdVault backup file: {}", error))?;
 
     /*
      * Validate backup version
@@ -726,97 +809,65 @@ fn import_data(
         ));
     }
 
-    let database_path =
-        get_database_path(&app)?;
+    let database_path = get_database_path(&app)?;
 
     /*
      * Convert backup collections
      * into database import models.
      */
-    let collections =
-        import_data
-            .collections
-            .into_iter()
-            .map(|collection| {
-                database::ImportCollection {
-                    name:
-                        collection.name,
+    let collections = import_data
+        .collections
+        .into_iter()
+        .map(|collection| database::ImportCollection {
+            name: collection.name,
 
-                    created_at:
-                        collection.created_at,
-                }
-            })
-            .collect();
+            created_at: collection.created_at,
+        })
+        .collect();
 
     /*
      * Convert backup snippets
      * into database import models.
      */
-    let snippets =
-        import_data
-            .snippets
-            .into_iter()
-            .map(|snippet| {
-                database::ImportSnippet {
-                    title:
-                        snippet.title,
+    let snippets = import_data
+        .snippets
+        .into_iter()
+        .map(|snippet| database::ImportSnippet {
+            title: snippet.title,
 
-                    tool:
-                        snippet.tool,
+            tool: snippet.tool,
 
-                    environment:
-                        snippet.environment,
+            environment: snippet.environment,
 
-                    category:
-                        snippet.category,
+            category: snippet.category,
 
-                    description:
-                        snippet.description,
+            description: snippet.description,
 
-                    template:
-                        snippet.template,
+            template: snippet.template,
 
-                    tags:
-                        snippet.tags,
+            tags: snippet.tags,
 
-                    created_at:
-                        snippet.created_at,
+            created_at: snippet.created_at,
 
-                    collections:
-                        snippet.collections,
-                }
-            })
-            .collect();
+            collections: snippet.collections,
+        })
+        .collect();
 
     /*
      * Everything below this point is handled
      * inside one SQLite transaction.
      */
-    let result =
-        database::import_data(
-            &database_path,
-            collections,
-            snippets,
-        )
-        .map_err(|error| {
-            format!(
-                "Failed to import backup: {}",
-                error
-            )
-        })?;
+    let result = database::import_data(&database_path, collections, snippets)
+        .map_err(|error| format!("Failed to import backup: {}", error))?;
 
     Ok(ImportResult {
-        imported_snippets:
-            result.imported_snippets,
+        imported_snippets: result.imported_snippets,
 
-        skipped_snippets:
-            result.skipped_snippets,
+        skipped_snippets: result.skipped_snippets,
 
-        created_collections:
-            result.created_collections,
+        created_collections: result.created_collections,
 
-        reused_collections:
-            result.reused_collections,
+        reused_collections: result.reused_collections,
     })
 }
 
@@ -829,6 +880,7 @@ fn import_data(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -861,7 +913,6 @@ pub fn run() {
             get_snippets,
             update_snippet,
             delete_snippet,
-            check_ai_health,
             /*
              * Collections
              */
@@ -879,13 +930,16 @@ pub fn run() {
             /*
              * Local AI
              */
+            check_ollama_status,
+            check_ai_health,
+            install_ollama_model,
             analyze_snippet,
             /*
              * Import / Export
              */
             export_data,
             validate_import_data,
-            import_data   
+            import_data
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

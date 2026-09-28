@@ -528,16 +528,11 @@ pub fn import_data(
     collections: Vec<ImportCollection>,
     snippets: Vec<ImportSnippet>,
 ) -> Result<ImportResult> {
-    let mut connection =
-        Connection::open(database_path)?;
+    let mut connection = Connection::open(database_path)?;
 
-    connection.execute(
-        "PRAGMA foreign_keys = ON",
-        [],
-    )?;
+    connection.execute("PRAGMA foreign_keys = ON", [])?;
 
-    let transaction =
-        connection.transaction()?;
+    let transaction = connection.transaction()?;
 
     let mut created_collections = 0;
     let mut reused_collections = 0;
@@ -551,25 +546,22 @@ pub fn import_data(
      */
 
     for collection in &collections {
-        let existing_id =
-            transaction.query_row(
-                "
+        let existing_id = transaction.query_row(
+            "
                     SELECT id
                     FROM collections
                     WHERE name = ?1 COLLATE NOCASE
                 ",
-                [&collection.name],
-                |row| row.get::<_, i64>(0),
-            );
+            [&collection.name],
+            |row| row.get::<_, i64>(0),
+        );
 
         match existing_id {
             Ok(_) => {
                 reused_collections += 1;
             }
 
-            Err(
-                rusqlite::Error::QueryReturnedNoRows,
-            ) => {
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
                 transaction.execute(
                     "
                         INSERT INTO collections (
@@ -578,10 +570,7 @@ pub fn import_data(
                         )
                         VALUES (?1, ?2)
                     ",
-                    (
-                        &collection.name,
-                        &collection.created_at,
-                    ),
+                    (&collection.name, &collection.created_at),
                 )?;
 
                 created_collections += 1;
@@ -607,37 +596,29 @@ pub fn import_data(
          * title + template are identical.
          */
 
-        let existing_snippet =
-            transaction.query_row(
-                "
+        let existing_snippet = transaction.query_row(
+            "
                     SELECT id
                     FROM snippets
                     WHERE title = ?1
                       AND template = ?2
                     LIMIT 1
                 ",
-                (
-                    &snippet.title,
-                    &snippet.template,
-                ),
-                |row| row.get::<_, i64>(0),
-            );
+            (&snippet.title, &snippet.template),
+            |row| row.get::<_, i64>(0),
+        );
 
-        let snippet_id =
-            match existing_snippet {
-                Ok(id) => {
-                    skipped_snippets += 1;
-                    id
-                }
+        let snippet_id = match existing_snippet {
+            Ok(id) => {
+                skipped_snippets += 1;
+                id
+            }
 
-                Err(
-                    rusqlite::Error::QueryReturnedNoRows,
-                ) => {
-                    let tags =
-                        snippet.tags.join(",");
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                let tags = snippet.tags.join(",");
 
-                    transaction.execute(
-                        "
+                transaction.execute(
+                    "
                             INSERT INTO snippets (
                                 title,
                                 tool,
@@ -653,27 +634,27 @@ pub fn import_data(
                                 ?5, ?6, ?7, ?8
                             )
                         ",
-                        (
-                            &snippet.title,
-                            &snippet.tool,
-                            &snippet.environment,
-                            &snippet.category,
-                            &snippet.description,
-                            &snippet.template,
-                            &tags,
-                            &snippet.created_at,
-                        ),
-                    )?;
+                    (
+                        &snippet.title,
+                        &snippet.tool,
+                        &snippet.environment,
+                        &snippet.category,
+                        &snippet.description,
+                        &snippet.template,
+                        &tags,
+                        &snippet.created_at,
+                    ),
+                )?;
 
-                    imported_snippets += 1;
+                imported_snippets += 1;
 
-                    transaction.last_insert_rowid()
-                }
+                transaction.last_insert_rowid()
+            }
 
-                Err(error) => {
-                    return Err(error);
-                }
-            };
+            Err(error) => {
+                return Err(error);
+            }
+        };
 
         /*
          * ----------------------------------------------------
@@ -689,19 +670,16 @@ pub fn import_data(
          * We preserve/merge that relationship.
          */
 
-        for collection_name
-            in &snippet.collections
-        {
-            let collection_id =
-                transaction.query_row(
-                    "
+        for collection_name in &snippet.collections {
+            let collection_id = transaction.query_row(
+                "
                         SELECT id
                         FROM collections
                         WHERE name = ?1 COLLATE NOCASE
                     ",
-                    [collection_name],
-                    |row| row.get::<_, i64>(0),
-                )?;
+                [collection_name],
+                |row| row.get::<_, i64>(0),
+            )?;
 
             transaction.execute(
                 "
@@ -712,10 +690,7 @@ pub fn import_data(
                     )
                     VALUES (?1, ?2)
                 ",
-                (
-                    snippet_id,
-                    collection_id,
-                ),
+                (snippet_id, collection_id),
             )?;
         }
     }

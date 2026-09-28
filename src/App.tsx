@@ -37,6 +37,12 @@ import {
 
 import type { Snippet } from "./data/mockSnippets";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  DEFAULT_AI_PROVIDER,
+  DEFAULT_AI_MODEL,
+  DEFAULT_AI_SERVER_URL,
+  type OllamaStatus,
+} from "./config/ai";
 
 type AnalyzeVariable = {
   name: string;
@@ -290,12 +296,29 @@ function App() {
   const [aiStatus, setAiStatus] =
     useState<AiStatus>("checking");
 
+  const [ollamaStatus, setOllamaStatus] =
+    useState<OllamaStatus | null>(null);
+
+  const [isInstallingModel, setIsInstallingModel] =
+    useState(false);
+
+  const [installModelError, setInstallModelError] =
+    useState<string | null>(null);
+
+  const [aiProvider, setAiProvider] =
+    useState(() =>
+      localStorage.getItem(
+        "cmdvault.ai.provider"
+      ) ??
+      DEFAULT_AI_PROVIDER
+    );
+
   const [aiServerUrl, setAiServerUrl] =
     useState(() =>
       localStorage.getItem(
         "cmdvault.ai.serverUrl"
       ) ??
-      "http://127.0.0.1:11434"
+      DEFAULT_AI_SERVER_URL
     );
 
   const [aiModel, setAiModel] =
@@ -303,8 +326,15 @@ function App() {
       localStorage.getItem(
         "cmdvault.ai.model"
       ) ??
-      "llama3.1:latest"
+      DEFAULT_AI_MODEL
     );
+
+  useEffect(() => {
+    localStorage.setItem(
+      "cmdvault.ai.provider",
+      aiProvider
+    );
+  }, [aiProvider]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1147,6 +1177,80 @@ function App() {
   /*
  * Local AI Health
  */
+  const checkOllamaStatus =
+    useCallback(async () => {
+      try {
+        const status =
+          await invoke<OllamaStatus>(
+            "check_ollama_status",
+            {
+              serverUrl:
+                aiServerUrl,
+              model:
+                aiModel,
+            }
+          );
+
+        setOllamaStatus(status);
+        console.log(
+          "Ollama status:",
+          status
+        );
+
+        return status;
+      } catch (error) {
+        console.warn(
+          "Failed to check Ollama status:",
+          error
+        );
+
+        const status = {
+          available: false,
+          modelInstalled: false,
+        };
+
+        setOllamaStatus(status);
+
+        return status;
+      }
+    }, [
+      aiServerUrl,
+      aiModel,
+    ]);
+
+  useEffect(() => {
+    checkOllamaStatus();
+  }, [checkOllamaStatus]);
+
+  const handleInstallModel = async () => {
+    if (isInstallingModel) {
+      return;
+    }
+
+    setIsInstallingModel(true);
+    setInstallModelError(null);
+
+    try {
+      await invoke("install_ollama_model", {
+        serverUrl: aiServerUrl,
+        model: aiModel,
+      });
+
+      await checkOllamaStatus();
+
+      await checkAiHealth();
+    } catch (error) {
+      console.error(
+        "Failed to install model:",
+        error
+      );
+
+      setInstallModelError(String(error));
+    } finally {
+      setIsInstallingModel(false);
+    }
+  };
+
   const checkAiHealth =
     useCallback(async (): Promise<boolean> => {
       setAiStatus("checking");
@@ -1616,13 +1720,19 @@ function App() {
   if (isFirstRun) {
     return (
       <FirstRunSetup
+        provider={aiProvider}
         serverUrl={aiServerUrl}
         model={aiModel}
         aiStatus={aiStatus}
+        ollamaStatus={ollamaStatus}
+        onProviderChange={setAiProvider}
         onServerUrlChange={setAiServerUrl}
         onModelChange={setAiModel}
         onTestConnection={checkAiHealth}
         onComplete={handleCompleteSetup}
+        isInstallingModel={isInstallingModel}
+        installModelError={installModelError}
+        onInstallModel={handleInstallModel}
       />
     );
   }
@@ -1667,12 +1777,18 @@ function App() {
 
         <main className="main">
           <Settings
+            provider={aiProvider}
             serverUrl={aiServerUrl}
             model={aiModel}
             aiStatus={aiStatus}
+            ollamaStatus={ollamaStatus}
+            isInstallingModel={isInstallingModel}
+            installModelError={installModelError}
+            onProviderChange={setAiProvider}
             onServerUrlChange={setAiServerUrl}
             onModelChange={setAiModel}
             onTestConnection={checkAiHealth}
+            onInstallModel={handleInstallModel}
             onExportData={handleExportData}
             onImportData={handleImportData}
           />
