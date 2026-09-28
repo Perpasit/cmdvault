@@ -1018,6 +1018,77 @@
   background: #000;
 }
 
+.import-backup-summary {
+  padding: 10px 12px;
+
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+
+  background: #fafafa;
+
+  color: #333;
+
+  font-size: 12px;
+}
+
+.import-backup-summary div+div {
+  margin-top: 4px;
+}
+
+.import-backup-summary strong {
+  font-weight: 600;
+}
+
+.confirm-import-button {
+  padding: 7px 14px;
+
+  border: 1px solid #333;
+  border-radius: 6px;
+
+  background: #222;
+
+  color: #fff;
+
+  font-size: 11px;
+
+  cursor: pointer;
+}
+
+.confirm-import-button:hover {
+  background: #000;
+}
+
+.import-result-summary {
+  margin-top: 10px;
+  padding: 6px 12px;
+
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+
+  background: #fafafa;
+}
+
+.import-result-summary div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 7px 0;
+
+  color: #555;
+
+  font-size: 12px;
+}
+
+.import-result-summary div+div {
+  border-top: 1px solid #ededed;
+}
+
+.import-result-summary strong {
+  color: #222;
+  font-weight: 600;
+}
+
 .creatable-select {
   position: relative;
   width: 100%;

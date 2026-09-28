@@ -24,6 +24,10 @@ import {
   save,
   open,
 } from "@tauri-apps/plugin-dialog";
+import ImportConfirmModal from "./components/ImportConfirmModal";
+import ImportResultModal from "./components/ImportResultModal";
+import ExportResultModal from "./components/ExportResultModal";
+import ErrorModal from "./components/ErrorModal";
 
 import {
   writeTextFile,
@@ -312,6 +316,32 @@ function App() {
     setIsEditing(false);
   };
 
+  const [
+    pendingImport,
+    setPendingImport,
+  ] = useState<{
+    data: string;
+    preview: ImportPreview;
+  } | null>(null);
+
+  const [
+    importResult,
+    setImportResult,
+  ] = useState<ImportResult | null>(null);
+
+  const [
+    isExportResultOpen,
+    setIsExportResultOpen,
+  ] = useState(false);
+
+  const [
+    dataError,
+    setDataError,
+  ] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
+
   const handleExportData = async () => {
     try {
       const data =
@@ -350,11 +380,18 @@ function App() {
         "CmdVault backup saved:",
         filePath
       );
+
+      setIsExportResultOpen(true);
     } catch (error) {
       console.error(
         "Failed to export data:",
         error
       );
+
+      setDataError({
+        title: "Export failed",
+        message: String(error),
+      });
     }
   };
 
@@ -459,9 +496,6 @@ function App() {
       const data =
         await readTextFile(filePath);
 
-      /*
-       * Validate first.
-       */
       const preview =
         await invoke<ImportPreview>(
           "validate_import_data",
@@ -470,26 +504,36 @@ function App() {
           }
         );
 
-      const confirmed =
-        window.confirm(
-          `Import CmdVault backup?\n\n` +
-          `${preview.snippetCount} snippets\n` +
-          `${preview.collectionCount} collections\n\n` +
-          `Existing data will be kept.`
-        );
+      setPendingImport({
+        data,
+        preview,
+      });
+    } catch (error) {
+      console.error(
+        "Failed to import data:",
+        error
+      );
 
-      if (!confirmed) {
-        return;
-      }
+      setPendingImport(null);
 
-      /*
-       * Import into SQLite.
-       */
+      setDataError({
+        title: "Import failed",
+        message: String(error),
+      });
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImport) {
+      return;
+    }
+
+    try {
       const result =
         await invoke<ImportResult>(
           "import_data",
           {
-            data,
+            data: pendingImport.data,
           }
         );
 
@@ -498,30 +542,25 @@ function App() {
         result
       );
 
-      /*
-       * Refresh data after import.
-       */
       await Promise.all([
         loadSnippets(),
         loadCollections(),
       ]);
 
-      window.alert(
-        `Import completed.\n\n` +
-        `Imported snippets: ${result.importedSnippets}\n` +
-        `Skipped duplicates: ${result.skippedSnippets}\n` +
-        `Created collections: ${result.createdCollections}\n` +
-        `Reused collections: ${result.reusedCollections}`
-      );
+      setPendingImport(null);
+      setImportResult(result);
     } catch (error) {
       console.error(
         "Failed to import data:",
         error
       );
 
-      window.alert(
-        `Import failed.\n\n${String(error)}`
-      );
+      setPendingImport(null);
+
+      setDataError({
+        title: "Import failed",
+        message: String(error),
+      });
     }
   };
 
@@ -1589,28 +1628,69 @@ function App() {
 
         <main className="main">
           <Settings
-            serverUrl={
-              aiServerUrl
-            }
-            model={
-              aiModel
-            }
-            aiStatus={
-              aiStatus
-            }
-            onServerUrlChange={
-              setAiServerUrl
-            }
-            onModelChange={
-              setAiModel
-            }
-            onTestConnection={
-              checkAiHealth
-            }
+            serverUrl={aiServerUrl}
+            model={aiModel}
+            aiStatus={aiStatus}
+            onServerUrlChange={setAiServerUrl}
+            onModelChange={setAiModel}
+            onTestConnection={checkAiHealth}
             onExportData={handleExportData}
             onImportData={handleImportData}
           />
         </main>
+
+        {pendingImport && (
+          <ImportConfirmModal
+            snippetCount={
+              pendingImport.preview.snippetCount
+            }
+            collectionCount={
+              pendingImport.preview.collectionCount
+            }
+            onCancel={() =>
+              setPendingImport(null)
+            }
+            onConfirm={
+              handleConfirmImport
+            }
+          />
+        )}
+        {importResult && (
+          <ImportResultModal
+            importedSnippets={
+              importResult.importedSnippets
+            }
+            skippedSnippets={
+              importResult.skippedSnippets
+            }
+            createdCollections={
+              importResult.createdCollections
+            }
+            reusedCollections={
+              importResult.reusedCollections
+            }
+            onClose={() =>
+              setImportResult(null)
+            }
+          />
+        )}
+        {isExportResultOpen && (
+          <ExportResultModal
+            onClose={() =>
+              setIsExportResultOpen(false)
+            }
+          />
+        )}
+
+        {dataError && (
+          <ErrorModal
+            title={dataError.title}
+            message={dataError.message}
+            onClose={() =>
+              setDataError(null)
+            }
+          />
+        )}
       </div>
     );
   }
